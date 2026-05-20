@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Global Deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return request.auth.uid == userId; }
+    function isValidMedia() {
+      return (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('video/.*'))
+             && request.resource.size < 50 * 1024 * 1024; // 50MB limit
+    }
+
+    match /profiles/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId) && isValidMedia();
+    }
+
+    match /posts/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(userId) && isValidMedia();
+    }
+    
+    match /chats/{chatId}/{fileName} {
+      // Very basic check since we can't easily query firestore participants
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidMedia();
+    }
+
+    match /showcase/{userId}/{fileName} {
+       allow read: if isSignedIn();
+       allow write: if isSignedIn() && isOwner(userId) && isValidMedia();
+    }
+  }
+}

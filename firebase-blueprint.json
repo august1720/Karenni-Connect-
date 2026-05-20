@@ -1,0 +1,129 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user profile (student/teacher).",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "school": { "type": "string" },
+        "location": { "type": "string" },
+        "bio": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "interests": { "type": "array" },
+        "skills": { "type": "array" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "username", "createdAt", "updatedAt"]
+    },
+    "School": {
+      "title": "School",
+      "description": "A school profile.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "clubs": { "type": "array" },
+        "photoURL": { "type": "string" },
+        "studentCount": { "type": "number" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "ownerId", "createdAt"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "An exchange event.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "number" },
+        "joinLink": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "description", "date", "creatorId", "createdAt"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "A student showcase or simple post.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "content": { "type": "string" },
+        "title": { "type": "string" },
+        "postType": { "type": "string", "enum": ["simple", "showcase"] },
+        "mediaURL": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["authorId", "content", "postType", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a post.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["authorId", "content", "createdAt"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "A like on a post.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "createdAt"]
+    },
+    "SavedPost": {
+      "title": "SavedPost",
+      "description": "A post saved by user.",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["postId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/schools/{schoolId}": {
+      "schema": { "$ref": "#/entities/School" },
+      "description": "Schools in the network"
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/Event" },
+      "description": "Events happening in schools"
+    },
+    "/posts/{postId}": {
+      "schema": { "$ref": "#/entities/Post" },
+      "description": "Posts created by users"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/Comment" },
+      "description": "Comments on a post"
+    },
+    "/posts/{postId}/likes/{userId}": {
+      "schema": { "$ref": "#/entities/Like" },
+      "description": "Likes on a post, mapped by userId"
+    },
+    "/users/{userId}/savedPosts/{postId}": {
+      "schema": { "$ref": "#/entities/SavedPost" },
+      "description": "Posts saved by a user, mapped by postId"
+    }
+  }
+}

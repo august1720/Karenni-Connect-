@@ -1,0 +1,6 @@
+{
+  "name": "Campus Connect",
+  "description": "Student collaboration platform with real-time messaging, video calls, and group study.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

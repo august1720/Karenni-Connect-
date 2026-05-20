@@ -1,0 +1,192 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function existing() { return resource.data; }
+    function incoming() { return request.resource.data; }
+
+    function isValidUser(data) {
+      return data.keys().hasAny(['name', 'username', 'createdAt', 'updatedAt']) 
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.username is string && data.username.size() > 0 && data.username.size() <= 50
+        && (data.get('school', '') is string && data.get('school', '').size() <= 100)
+        && (data.get('location', '') is string && data.get('location', '').size() <= 100)
+        && (data.get('bio', '') is string && data.get('bio', '').size() <= 500)
+        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 500)
+        && (data.get('interests', []) is list && data.get('interests', []).size() <= 20)
+        && (data.get('skills', []) is list && data.get('skills', []).size() <= 20)
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn(); // We can search users.
+
+      allow create: if isSignedIn() 
+        && request.auth.uid == userId
+        && isValidUser(incoming());
+      
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && isValidUser(incoming())
+        && incoming().createdAt == existing().createdAt;
+    }
+
+    function isValidSchool(data) {
+      return data.keys().hasAny(['name', 'ownerId', 'createdAt'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 150
+        && (data.get('description', '') is string && data.get('description', '').size() <= 1000)
+        && (data.get('clubs', []) is list && data.get('clubs', []).size() <= 50)
+        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 500)
+        && (data.get('studentCount', 0) is number)
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.createdAt is number;
+    }
+
+    match /schools/{schoolId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() 
+        && isValidSchool(incoming());
+      
+      allow update: if isSignedIn()
+        && existing().ownerId == request.auth.uid
+        && isValidSchool(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt;
+    }
+
+    function isValidEvent(data) {
+       return data.keys().hasAny(['title', 'description', 'date', 'creatorId', 'createdAt'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 150
+        && data.description is string && data.description.size() <= 1000
+        && data.date is number 
+        && (data.get('joinLink', '') is string && data.get('joinLink', '').size() <= 500)
+        && (data.get('schoolId', '') is string && data.get('schoolId', '').size() <= 128)
+        && data.creatorId is string && data.creatorId == request.auth.uid
+        && data.createdAt is number;
+    }
+
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() 
+        && isValidEvent(incoming());
+    }
+
+    function isValidPost(data) {
+      return data.keys().hasAny(['authorId', 'content', 'postType', 'createdAt'])
+        && data.authorId is string && data.authorId == request.auth.uid
+        && data.content is string && data.content.size() > 0 && data.content.size() <= 2000
+        && (data.get('title', '') is string && data.get('title', '').size() <= 150)
+        && data.postType is string && data.postType in ['simple', 'showcase']
+        && (data.get('mediaURL', '') is string && data.get('mediaURL', '').size() <= 500)
+        && data.createdAt is number
+        && (data.get('likesCount', 0) is number)
+        && (data.get('commentsCount', 0) is number);
+    }
+
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() 
+        && isValidPost(incoming())
+        && incoming().get('likesCount', 0) == 0
+        && incoming().get('commentsCount', 0) == 0;
+      
+      allow update: if isSignedIn()
+        && (
+          (request.auth.uid == existing().authorId && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'title', 'mediaURL']) && isValidPost(incoming()) && incoming().authorId == existing().authorId && incoming().createdAt == existing().createdAt)
+          ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount']))
+        );
+      
+      allow delete: if isSignedIn() && existing().authorId == request.auth.uid;
+      
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && incoming().keys().hasAny(['authorId', 'content', 'createdAt'])
+          && incoming().authorId == request.auth.uid
+          && incoming().content is string && incoming().content.size() > 0 && incoming().content.size() <= 500;
+        allow delete: if isSignedIn() && existing().authorId == request.auth.uid;
+      }
+      
+      match /likes/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.auth.uid == userId
+          && incoming().keys().hasAny(['userId', 'createdAt'])
+          && incoming().userId == request.auth.uid;
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /users/{userId}/savedPosts/{postId} {
+        allow read: if isSignedIn() && request.auth.uid == userId;
+        allow create: if isSignedIn()
+          && request.auth.uid == userId
+          && incoming().keys().hasAny(['postId', 'createdAt'])
+          && incoming().postId == postId;
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/following/{followedId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId
+        && incoming().keys().hasAny(['createdAt']);
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/followers/{followerId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == followerId
+        && incoming().keys().hasAny(['createdAt']);
+      allow delete: if isSignedIn() && request.auth.uid == followerId;
+    }
+
+    match /users/{userId}/notifications/{notificationId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn()
+        && incoming().keys().hasAny(['type', 'fromUserId', 'createdAt'])
+        && incoming().fromUserId == request.auth.uid;
+      allow update: if isSignedIn() && request.auth.uid == userId
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /chats/{chatId} {
+      allow read, update: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn() && request.auth.uid in incoming().participants;
+      
+      match /messages/{messageId} {
+         allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+         allow create: if isSignedIn() 
+           && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+           && incoming().authorId == request.auth.uid;
+         allow delete: if isSignedIn() && existing().authorId == request.auth.uid;
+      }
+    }
+
+    match /calls/{roomId} {
+      allow read, write: if isSignedIn();
+      
+      match /offerCandidates/{id} {
+        allow read, write: if isSignedIn();
+      }
+      match /answerCandidates/{id} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /calls_history/{id} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

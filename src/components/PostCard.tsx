@@ -8,11 +8,30 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, MoreHorizontal, Trash2, Edit2, Check, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { CommentsModal } from './CommentsModal';
+import { Link } from 'react-router-dom';
 
 interface PostCardProps {
   key?: React.Key;
   post: Post;
   onDelete?: (postId: string) => void;
+}
+
+export function formatRelativeTime(date: number) {
+  const now = Date.now();
+  const diff = now - date;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const months = Math.floor(days / 30);
+  const years = Math.floor(months / 12);
+
+  if (years > 0) return years === 1 ? '1 year ago' : `${years} years ago`;
+  if (months > 0) return months === 1 ? '1 month ago' : `${months} months ago`;
+  if (days > 0) return days === 1 ? '1 day ago' : `${days} days ago`;
+  if (hours > 0) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+  if (minutes > 0) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+  return 'just now';
 }
 
 export function PostCard({ post, onDelete }: PostCardProps) {
@@ -114,17 +133,21 @@ export function PostCard({ post, onDelete }: PostCardProps) {
         className="bg-white dark:bg-slate-800 rounded-[2rem] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50 relative"
       >
         <div className="flex items-center gap-3 mb-3">
-          {author?.photoURL ? (
-            <img src={author.photoURL} alt={author.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#1E3A8A] to-[#D62828] text-white flex items-center justify-center font-bold text-sm shadow-inner shrink-0">
-              {author?.name?.charAt(0).toUpperCase() || 'U'}
-            </div>
-          )}
+          <Link to={`/user/${post.authorId}`}>
+            {author?.photoURL ? (
+              <img src={author.photoURL} alt={author.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#1E3A8A] to-[#D62828] text-white flex items-center justify-center font-bold text-sm shadow-inner shrink-0">
+                {author?.name?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
+          </Link>
           
           <div className="flex-1">
-            <p className="font-semibold text-slate-900 dark:text-white text-sm">{author?.name || 'Loading...'}</p>
-            <p className="text-[11px] text-slate-500 font-medium">{new Date(post.createdAt).toLocaleDateString()}</p>
+            <Link to={`/user/${post.authorId}`} className="hover:underline">
+              <p className="font-semibold text-slate-900 dark:text-white text-sm">{author?.name || 'Loading...'}</p>
+            </Link>
+            <p className="text-[11px] text-slate-500 font-medium">{formatRelativeTime(post.createdAt)}</p>
           </div>
           
           {currentUser?.uid === post.authorId && (
@@ -206,7 +229,9 @@ export function PostCard({ post, onDelete }: PostCardProps) {
             className={`flex items-center gap-1.5 transition-colors group ${isLiked ? 'text-rose-500' : 'hover:text-rose-500'}`}
           >
             <div className="p-1.5 rounded-full group-hover:bg-rose-50 dark:group-hover:bg-rose-500/10 transition-colors">
-              <Heart className={`w-5 h-5 ${isLiked ? 'fill-rose-500' : ''}`} />
+              <motion.div animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }} transition={{ duration: 0.3 }}>
+                <Heart className={`w-5 h-5 ${isLiked ? 'fill-rose-500' : ''}`} />
+              </motion.div>
             </div>
             {likesCount > 0 ? likesCount : 'Like'}
           </motion.button>

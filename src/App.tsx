@@ -15,6 +15,10 @@ import Profile from './pages/Profile';
 import Messages from './pages/Messages';
 import Navigation from './components/Navigation';
 
+import UserProfile from './pages/UserProfile';
+import Settings from './pages/Settings';
+import { LanguageProvider } from './context/LanguageContext';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { currentUser, userProfile, loading } = useAuth();
   const location = useLocation();
@@ -25,17 +29,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!userProfile) return <Navigate to="/register-profile" replace />;
 
   const isChatRoom = location.pathname.startsWith('/messages/') && location.pathname !== '/messages';
+  const hidenav = isChatRoom || location.pathname === '/settings';
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#0F172A] text-slate-900 dark:text-slate-50 font-sans selection:bg-[#D62828]/20 dark:selection:bg-[#D62828]/40 transition-colors duration-300 relative">
       <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] bg-[#D62828]/5 dark:bg-[#D62828]/10 rounded-full blur-[80px] pointer-events-none mix-blend-multiply dark:mix-blend-screen"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] bg-[#1E3A8A]/5 dark:bg-[#1E3A8A]/15 rounded-full blur-[80px] pointer-events-none mix-blend-multiply dark:mix-blend-screen"></div>
-      <main className={`flex-1 overflow-y-auto ${isChatRoom ? 'pb-0' : 'pb-28'} pt-8 relative z-10`}>
+      <main className={`flex-1 overflow-y-auto ${hidenav ? 'pb-0' : 'pb-28'} pt-8 relative z-10`}>
         <div className={`max-w-md mx-auto w-full min-h-full ${isChatRoom ? '' : 'px-4'}`}>
           {children}
         </div>
       </main>
-      {!isChatRoom && <Navigation />}
+      {!hidenav && <Navigation />}
     </div>
   );
 }
@@ -43,17 +48,21 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register-profile" element={<RegisterProfile />} />
-          <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-          <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
-          <Route path="/messages/*" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-          <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        </Routes>
-      </Router>
+      <LanguageProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register-profile" element={<RegisterProfile />} />
+            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+            <Route path="/messages/*" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+            <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/user/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+          </Routes>
+        </Router>
+      </LanguageProvider>
     </AuthProvider>
   );
 }

@@ -2,14 +2,17 @@ import { NavLink } from 'react-router-dom';
 import { Home, Compass, MessageCircle, Calendar, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'framer-motion';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function Navigation() {
+  const { t } = useLanguage();
+
   const navItems = [
-    { to: "/", icon: Home, label: "Home" },
-    { to: "/discover", icon: Compass, label: "Exchange" },
-    { to: "/messages", icon: MessageCircle, label: "Messages" },
-    { to: "/events", icon: Calendar, label: "Events" },
-    { to: "/profile", icon: User, label: "Profile" },
+    { to: "/", icon: Home, label: t("Home") },
+    { to: "/discover", icon: Compass, label: t("Discover") },
+    { to: "/messages", icon: MessageCircle, label: t("Messages") },
+    { to: "/events", icon: Calendar, label: t("Events") },
+    { to: "/profile", icon: User, label: t("Profile") },
   ];
 
   return (

@@ -2,14 +2,37 @@ export interface User {
   id: string; // Document ID
   name: string;
   username: string;
+  educationLevel?: string;
   school?: string;
+  studentId?: string;
+  educationDescription?: string;
   location?: string;
   bio?: string;
   photoURL?: string;
+  majorEthnicity?: string;
+  subEthnicity?: string;
+  customEthnicity?: string;
   interests?: string[];
   skills?: string[];
+  visibility?: Record<string, 'public' | 'private'>;
   createdAt: number;
   updatedAt: number;
+  settings?: {
+    theme?: string;
+    language?: string;
+    isPrivate?: boolean;
+    notifications?: {
+      push?: boolean;
+      messages?: boolean;
+      events?: boolean;
+    };
+    media?: {
+      compress?: boolean;
+    };
+    accessibility?: {
+      largerText?: boolean;
+    };
+  };
 }
 
 export interface School {

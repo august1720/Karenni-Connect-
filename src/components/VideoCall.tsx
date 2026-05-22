@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { collection, doc, addDoc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { PhoneOff, Mic, MicOff, Video as VidIcon, VideoOff, Maximize, Minimize } from 'lucide-react';
+import { PhoneOff, Mic, MicOff, Video as VidIcon, VideoOff, Maximize, Minimize, MonitorUp } from 'lucide-react';
 import { User } from '../types';
 
 interface VideoCallProps {
@@ -21,6 +21,7 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   
@@ -112,8 +113,7 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
 
     const callData = (await getDoc(callDoc)).data();
     if (!callData?.offer) {
-       // Setup failed or no offer
-       startCall(); // Fallback to start
+       startCall(); 
        return;
     }
 
@@ -136,7 +136,6 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
   };
 
   useEffect(() => {
-    // Check if there is an active call doc
     getDoc(doc(db, 'calls', roomId)).then((snap) => {
        if (snap.exists() && snap.data().offer) {
            answerCall();
@@ -165,10 +164,61 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
     }
   };
 
+  const toggleScreenShare = async () => {
+    if (!peerConnection.current || !localStream) return;
+
+    try {
+      if (!isScreenSharing) {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenTrack = screenStream.getVideoTracks()[0];
+        
+        screenTrack.onended = () => {
+           stopScreenShare();
+        };
+
+        const sender = peerConnection.current.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(screenTrack);
+        }
+        
+        if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
+        setIsScreenSharing(true);
+      } else {
+        stopScreenShare();
+      }
+    } catch (e) {
+      console.error('Error sharing screen', e);
+    }
+  };
+  
+  const stopScreenShare = () => {
+    if (!peerConnection.current || !localStream) return;
+    
+    // Stop the existing screen tracks if they are active on the video element
+    if (localVideoRef.current?.srcObject) {
+       (localVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => {
+         if (t.kind === 'video' && localStream.getVideoTracks().indexOf(t) === -1) {
+            t.stop();
+         }
+       });
+    }
+
+    const videoTrack = localStream.getVideoTracks()[0];
+    const sender = peerConnection.current.getSenders().find(s => s.track?.kind === 'video');
+    if (sender && videoTrack) {
+      sender.replaceTrack(videoTrack);
+    }
+    
+    if (localVideoRef.current) localVideoRef.current.srcObject = localStream;
+    setIsScreenSharing(false);
+  };
+
   const handleHangup = async () => {
     localStream?.getTracks().forEach(track => track.stop());
+    if (localVideoRef.current?.srcObject) {
+       (localVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+    }
     peerConnection.current?.close();
-    // Simple cleanup: delete doc
     await addDoc(collection(db, 'calls_history'), { room: roomId, endedAt: Date.now() });
     onEnd();
   };
@@ -221,6 +271,10 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
             
             <button onClick={toggleVideo} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isVideoOn ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}>
               {isVideoOn ? <VidIcon className="w-5 h-5"/> : <VideoOff className="w-5 h-5"/>}
+            </button>
+
+            <button onClick={toggleScreenShare} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isScreenSharing ? 'bg-blue-500 hover:bg-blue-600' : 'bg-slate-700 hover:bg-slate-600'} text-white hidden sm:flex`}>
+               <MonitorUp className="w-5 h-5" />
             </button>
 
             <div className="w-px h-8 bg-slate-700 mx-2"></div>

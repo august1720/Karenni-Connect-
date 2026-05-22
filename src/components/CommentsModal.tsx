@@ -8,6 +8,10 @@ import { Button } from './ui/Button';
 import { X, Trash2 } from 'lucide-react';
 import { Comment } from '../types';
 
+import { Link } from 'react-router-dom';
+
+import { createPortal } from 'react-dom';
+
 interface CommentsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -21,15 +25,19 @@ function CommentItem({ comment, postId, onDelete }: { key?: React.Key, comment: 
   
   return (
     <div className="flex gap-3 relative py-3 group">
-      {author?.photoURL ? (
-        <img src={author.photoURL} alt={author.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
-      ) : (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#1E3A8A] to-[#D62828] text-white flex items-center justify-center font-bold text-xs shrink-0">
-          {author?.name?.charAt(0).toUpperCase() || 'U'}
-        </div>
-      )}
+      <Link to={`/user/${author?.id || comment.authorId}`} className="shrink-0">
+        {author?.photoURL ? (
+          <img src={author.photoURL} alt={author.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#1E3A8A] to-[#D62828] text-white flex items-center justify-center font-bold text-xs shrink-0">
+            {author?.name?.charAt(0).toUpperCase() || 'U'}
+          </div>
+        )}
+      </Link>
       <div className="flex-1 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-2xl rounded-tl-none">
-        <h4 className="font-semibold text-sm text-slate-900 dark:text-white">{author?.name || 'Loading...'}</h4>
+        <Link to={`/user/${author?.id || comment.authorId}`} className="hover:underline">
+          <h4 className="font-semibold text-sm text-slate-900 dark:text-white">{author?.name || 'Loading...'}</h4>
+        </Link>
         <p className="text-sm text-slate-700 dark:text-slate-300 mt-1">{comment.content}</p>
         <span className="text-[10px] text-slate-400 mt-2 block">{new Date(comment.createdAt).toLocaleDateString()}</span>
       </div>
@@ -137,13 +145,13 @@ export function CommentsModal({ isOpen, onClose, postId, postAuthorId }: Comment
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 sm:p-0"
+        className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 sm:p-0"
       >
         <motion.div 
           initial={{ y: '100%' }}
@@ -189,6 +197,7 @@ export function CommentsModal({ isOpen, onClose, postId, postAuthorId }: Comment
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

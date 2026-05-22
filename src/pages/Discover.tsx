@@ -13,7 +13,7 @@ export default function Discover() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<'match' | 'groups'>('match');
+  const [activeTab, setActiveTab] = useState<'match' | 'groups' | 'mentors'>('match');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -138,6 +138,12 @@ export default function Discover() {
           >
             Study Groups
           </button>
+          <button 
+            onClick={() => setActiveTab('mentors')}
+            className={`flex-1 py-2 rounded-full text-sm font-semibold transition-all ${activeTab === 'mentors' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500'}`}
+          >
+            Mentors
+          </button>
         </div>
 
         {activeTab === 'match' && (
@@ -245,6 +251,19 @@ export default function Discover() {
           <p className="text-sm text-slate-500 max-w-xs mb-6">Create or join learning groups to collaborate and share knowledge with your peers.</p>
           <button className="px-6 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold rounded-full shadow-md">
             Create Study Session
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'mentors' && (
+        <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+          <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mb-4">
+            <BookOpen className="w-10 h-10" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Community Mentors</h3>
+          <p className="text-sm text-slate-500 max-w-xs mb-6">Connect with experienced peers, request 1-on-1 guidance, or offer your skills to help others.</p>
+          <button className="px-6 py-2.5 bg-gradient-to-r from-[#1E3A8A] to-blue-500 text-white font-semibold rounded-full shadow-md hover:shadow-lg transition-all">
+            Find a Mentor
           </button>
         </div>
       )}

@@ -12,16 +12,75 @@ interface EditProfileModalProps {
   onClose: () => void;
 }
 
+const MAJOR_ETHNICITIES = [
+  'Bamar', 'Shan', 'Karen (Kayin)', 'Kayah (Karenni)', 'Rakhine', 'Mon', 'Chin', 'Kachin', 'Others'
+];
+
+const KAYAH_SUBGROUPS = [
+  'Kayah', 'Kayan (Padaung)', 'Kayaw', 'Bre (Bwe)', 'Manu Manaw', 'Geba', 'Yintale', 'Yinbaw', 'Others'
+];
+
+const SUB_ETHNICITIES_MAP: Record<string, string[]> = {
+  'Kayah (Karenni)': KAYAH_SUBGROUPS,
+};
+
+type Visibility = 'public' | 'private';
+
+const VisibilityToggle = ({ label, value, onChange }: { label: string, value: Visibility, onChange: (v: Visibility) => void }) => {
+  return (
+    <div className="flex items-center justify-between mb-2">
+      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</label>
+      <div className="flex bg-slate-200 dark:bg-slate-700 p-0.5 rounded-md">
+        <button
+          type="button"
+          onClick={() => onChange('public')}
+          className={`px-2 py-0.5 text-[10px] font-semibold rounded-sm transition-all ${value === 'public' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+        >
+          Public
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange('private')}
+          className={`px-2 py-0.5 text-[10px] font-semibold rounded-sm transition-all ${value === 'private' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+        >
+          Private
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const { userProfile, currentUser, refreshProfile } = useAuth();
   const [formData, setFormData] = useState({
     name: userProfile?.name || '',
     username: userProfile?.username || '',
     bio: userProfile?.bio || '',
+    educationLevel: userProfile?.educationLevel || '',
     school: userProfile?.school || '',
+    studentId: userProfile?.studentId || '',
+    educationDescription: userProfile?.educationDescription || '',
     location: userProfile?.location || '',
+    majorEthnicity: userProfile?.majorEthnicity || '',
+    subEthnicity: userProfile?.subEthnicity || '',
+    customEthnicity: userProfile?.customEthnicity || '',
   });
+  const [visibility, setVisibility] = useState<Record<string, 'public' | 'private'>>(
+    userProfile?.visibility || {
+      name: 'public',
+      username: 'public',
+      education: 'public',
+      location: 'public',
+      bio: 'public',
+      interests: 'public',
+      ethnicity: 'public'
+    }
+  );
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+
+  const handleVisibilityChange = (field: string, val: 'public' | 'private') => {
+    setVisibility(prev => ({ ...prev, [field]: val }));
+  };
   const [photoPreview, setPhotoPreview] = useState<string | null>(userProfile?.photoURL || null);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -42,6 +101,7 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
     setIsSaving(true);
     try {
       let photoURL = userProfile.photoURL;
+      // ... same logic
       if (selectedPhoto) {
         photoURL = await uploadMedia(selectedPhoto, `profiles/${currentUser.uid}`, (progress) => {
           setUploadProgress(progress);
@@ -50,14 +110,16 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
 
       await updateDoc(doc(db, 'users', currentUser.uid), {
         ...formData,
+        visibility,
         ...(photoURL && { photoURL }),
         updatedAt: Date.now()
       });
 
       await refreshProfile();
       onClose();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error updating profile:', e);
+      alert('Error updating profile: ' + (e.message || String(e)));
       setUploadProgress(-1);
     } finally {
       setIsSaving(false);
@@ -65,12 +127,14 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   };
 
   return (
-    <AnimatePresence>
-      <motion.div 
+    <>
+      <style>{`nav { display: none !important; }`}</style>
+      <AnimatePresence>
+        <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 sm:p-0"
+        className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 sm:p-0"
       >
         <motion.div 
           initial={{ y: '100%' }}
@@ -111,31 +175,115 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Name</label>
-                <input type="text" value={formData.name} onChange={e => setFormData(f => ({ ...f, name: e.target.value }))} className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" />
+            <div className="space-y-6">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700/50">
+                <VisibilityToggle label="Name" value={visibility.name} onChange={(v) => handleVisibilityChange('name', v)} />
+                <input type="text" value={formData.name} onChange={e => setFormData(f => ({ ...f, name: e.target.value }))} className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Username</label>
-                <input type="text" value={formData.username} onChange={e => setFormData(f => ({ ...f, username: e.target.value }))} className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" />
+              
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700/50">
+                <VisibilityToggle label="Username" value={visibility.username} onChange={(v) => handleVisibilityChange('username', v)} />
+                <input type="text" value={formData.username} onChange={e => setFormData(f => ({ ...f, username: e.target.value }))} className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Bio</label>
-                <textarea rows={3} value={formData.bio} onChange={e => setFormData(f => ({ ...f, bio: e.target.value }))} className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium resize-none" />
+              
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700/50">
+                <VisibilityToggle label="Ethnicity" value={visibility.ethnicity} onChange={(v) => handleVisibilityChange('ethnicity', v)} />
+                <select 
+                  value={formData.majorEthnicity} 
+                  onChange={e => setFormData(f => ({ ...f, majorEthnicity: e.target.value, subEthnicity: '', customEthnicity: '' }))} 
+                  className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium mb-3 appearance-none"
+                >
+                  <option value="" disabled>Select Major Ethnicity</option>
+                  {MAJOR_ETHNICITIES.map(eth => (
+                    <option key={eth} value={eth}>{eth}</option>
+                  ))}
+                </select>
+
+                {formData.majorEthnicity && SUB_ETHNICITIES_MAP[formData.majorEthnicity] ? (
+                  <select 
+                    value={formData.subEthnicity} 
+                    onChange={e => setFormData(f => ({ ...f, subEthnicity: e.target.value, customEthnicity: '' }))} 
+                    className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium mb-3 appearance-none"
+                  >
+                    <option value="" disabled>Select Subgroup</option>
+                    {SUB_ETHNICITIES_MAP[formData.majorEthnicity].map(eth => (
+                      <option key={eth} value={eth}>{eth}</option>
+                    ))}
+                  </select>
+                ) : null}
+
+                {(formData.majorEthnicity === 'Others' || formData.subEthnicity === 'Others') && (
+                  <input 
+                    type="text" 
+                    placeholder="Please specify your ethnicity"
+                    value={formData.customEthnicity} 
+                    onChange={e => setFormData(f => ({ ...f, customEthnicity: e.target.value }))} 
+                    className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" 
+                  />
+                )}
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">School / College</label>
-                <input type="text" value={formData.school} onChange={e => setFormData(f => ({ ...f, school: e.target.value }))} className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" />
+
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700/50">
+                <VisibilityToggle label="Education" value={visibility.education} onChange={(v) => handleVisibilityChange('education', v)} />
+                <div className="space-y-3">
+                  <select 
+                      value={formData.educationLevel} 
+                      onChange={e => setFormData(f => ({ ...f, educationLevel: e.target.value, school: '', studentId: '', educationDescription: '' }))} 
+                      className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium appearance-none"
+                    >
+                      <option value="" disabled>Select Education Level</option>
+                      <option value="High School">High School</option>
+                      <option value="College">College</option>
+                      <option value="University">University</option>
+                      <option value="Others">Others</option>
+                  </select>
+
+                  {formData.educationLevel && (
+                    <input 
+                      type="text" 
+                      placeholder="School / Institution Name"
+                      value={formData.school} 
+                      onChange={e => setFormData(f => ({ ...f, school: e.target.value }))} 
+                      className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" 
+                    />
+                  )}
+
+                  {(formData.educationLevel === 'College' || formData.educationLevel === 'University') && (
+                    <input 
+                      type="text" 
+                      placeholder="Student ID / Roll Number"
+                      value={formData.studentId} 
+                      onChange={e => setFormData(f => ({ ...f, studentId: e.target.value }))} 
+                      className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" 
+                    />
+                  )}
+
+                  {formData.educationLevel === 'Others' && (
+                    <input 
+                      type="text" 
+                      placeholder="Brief description about your education"
+                      value={formData.educationDescription} 
+                      onChange={e => setFormData(f => ({ ...f, educationDescription: e.target.value }))} 
+                      className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" 
+                    />
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Location</label>
-                <input type="text" value={formData.location} onChange={e => setFormData(f => ({ ...f, location: e.target.value }))} className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" />
+
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700/50">
+                <VisibilityToggle label="Location" value={visibility.location} onChange={(v) => handleVisibilityChange('location', v)} />
+                <input type="text" value={formData.location} onChange={e => setFormData(f => ({ ...f, location: e.target.value }))} className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium" />
+              </div>
+              
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-700/50">
+                <VisibilityToggle label="Bio" value={visibility.bio} onChange={(v) => handleVisibilityChange('bio', v)} />
+                <textarea rows={3} value={formData.bio} onChange={e => setFormData(f => ({ ...f, bio: e.target.value }))} className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-[#D62828] outline-none transition-all font-medium resize-none" />
               </div>
             </div>
           </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
+    </>
   );
 }

@@ -41,7 +41,19 @@ function ChatList() {
     );
     
     const unsub = onSnapshot(q, (snap) => {
-      setChats(snap.docs.map(d => ({ id: d.id, ...d.data() } as Chat)));
+      const allChats = snap.docs.map(d => ({ id: d.id, ...d.data() } as Chat));
+      // Deduplicate by other user id
+      const uniqueChats = [];
+      const seenUsers = new Set();
+      
+      for (const chat of allChats) {
+        const otherUserId = chat.participants.find(p => p !== currentUser.uid) || currentUser.uid;
+        if (!seenUsers.has(otherUserId)) {
+          seenUsers.add(otherUserId);
+          uniqueChats.push(chat);
+        }
+      }
+      setChats(uniqueChats);
     });
     return unsub;
   }, [currentUser]);
@@ -117,12 +129,23 @@ function ChatRoom() {
 
     const q = query(collection(db, 'chats', chatId, 'messages'), orderBy('createdAt', 'asc'));
     const unsubMsgs = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as Message)));
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
+      setMessages(msgs);
       
       // mark as read
-      if (chatInfo?.unreadCount?.[currentUser.uid] && chatInfo.unreadCount[currentUser.uid] > 0) {
+      let hasUnread = false;
+      msgs.forEach(msg => {
+          if (msg.authorId !== currentUser.uid && (!msg.readBy || !msg.readBy.includes(currentUser.uid))) {
+              hasUnread = true;
+              setDoc(doc(db, 'chats', chatId, 'messages', msg.id), {
+                 readBy: [...(msg.readBy || []), currentUser.uid]
+              }, { merge: true });
+          }
+      });
+
+      if (hasUnread || (chatInfo?.unreadCount?.[currentUser.uid] && chatInfo.unreadCount[currentUser.uid] > 0)) {
         setDoc(doc(db, 'chats', chatId), {
-           unreadCount: { ...chatInfo.unreadCount, [currentUser.uid]: 0 }
+           unreadCount: { ...(chatInfo?.unreadCount || {}), [currentUser.uid]: 0 }
         }, { merge: true });
       }
     });

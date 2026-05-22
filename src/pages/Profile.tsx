@@ -5,9 +5,12 @@ import { collection, query, where, getCountFromServer } from 'firebase/firestore
 import { Button } from '../components/ui/Button';
 import { motion } from 'framer-motion';
 import { EditProfileModal } from '../components/EditProfileModal';
+import { Settings as SettingsIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
   const { userProfile, currentUser } = useAuth();
+  const navigate = useNavigate();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [postsCount, setPostsCount] = useState(0);
   const [followersCount, setFollowersCount] = useState(0);
@@ -39,8 +42,8 @@ export default function Profile() {
     <div className="flex flex-col gap-6 pt-4 pb-12">
       <div className="flex items-center justify-between px-2">
         <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
-        <button onClick={() => auth.signOut()} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+        <button onClick={() => navigate('/settings')} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+          <SettingsIcon className="w-5 h-5" />
         </button>
       </div>
       
@@ -88,13 +91,19 @@ export default function Profile() {
             </div>
             
             <div className="space-y-5 mt-4">
-              <div className="flex gap-3 text-sm">
-                <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">🎓</div>
-                <div className="pt-1">
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">School / College</p>
-                  <p className="text-slate-500">{userProfile.school || 'Not specified'}</p>
+              {userProfile.educationLevel && (
+                <div className="flex gap-3 text-sm">
+                  <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">🎓</div>
+                  <div className="pt-1">
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">Education ({userProfile.educationLevel})</p>
+                    <p className="text-slate-500">
+                      {userProfile.school || 'Not specified'} 
+                      {userProfile.studentId ? ` | ID: ${userProfile.studentId}` : ''}
+                      {userProfile.educationDescription ? ` | ${userProfile.educationDescription}` : ''}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex gap-3 text-sm">
                 <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">📍</div>
                 <div className="pt-1">
@@ -102,10 +111,24 @@ export default function Profile() {
                   <p className="text-slate-500">{userProfile.location || 'Not specified'}</p>
                 </div>
               </div>
+              {(userProfile.majorEthnicity || userProfile.customEthnicity) && (
+                <div className="flex gap-3 text-sm">
+                  <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">🌍</div>
+                  <div className="pt-1">
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">Ethnicity</p>
+                    <p className="text-slate-500">
+                      {userProfile.majorEthnicity === 'Others' || userProfile.subEthnicity === 'Others' 
+                        ? userProfile.customEthnicity 
+                        : `${userProfile.majorEthnicity}${userProfile.subEthnicity ? ` - ${userProfile.subEthnicity}` : ''}`
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
               {userProfile.bio && (
                 <div className="flex gap-3 text-sm">
                   <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">📝</div>
-                  <div className="pt-1 w-full text-slate-600 dark:text-slate-400 font-medium">
+                  <div className="pt-1 w-full text-slate-600 dark:text-slate-400 font-medium whitespace-pre-wrap">
                     {userProfile.bio}
                   </div>
                 </div>

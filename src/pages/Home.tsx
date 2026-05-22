@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, limit, getDocs, doc, setDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, query, orderBy, limit, getDocs, doc, setDoc, addDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, storage } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Post } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PostCard } from '../components/PostCard';
 import { uploadMedia } from '../lib/storage';
-import { Image, X, Video, StopCircle } from 'lucide-react';
+import { Image, X, Video, StopCircle, RefreshCw, Search } from 'lucide-react';
 
 export default function Home() {
   const { userProfile, currentUser } = useAuth();
@@ -28,6 +29,44 @@ export default function Home() {
   const chunksRef = useRef<BlobPart[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [stories, setStories] = useState<any[]>([]);
+  const storyFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingStory, setIsUploadingStory] = useState(false);
+
+  const [pullProgress, setPullProgress] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const touchCurrentY = useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      touchStartY.current = e.touches[0].clientY;
+    } else {
+      touchStartY.current = 0;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current > 0 && window.scrollY === 0) {
+      touchCurrentY.current = e.touches[0].clientY;
+      const pullDistance = touchCurrentY.current - touchStartY.current;
+      if (pullDistance > 0 && pullDistance < 150) {
+        setPullProgress(pullDistance);
+      }
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (pullProgress > 80 && !isRefreshing) {
+      setIsRefreshing(true);
+      await fetchPosts();
+      setIsRefreshing(false);
+    }
+    setPullProgress(0);
+    touchStartY.current = 0;
+  };
+
   const fetchPosts = async () => {
     try {
       setLoading(true);
@@ -35,6 +74,10 @@ export default function Home() {
       const snapshot = await getDocs(postsQuery);
       const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
       setPosts(fetchedPosts);
+
+      const storiesQuery = query(collection(db, 'stories'), orderBy('createdAt', 'desc'), limit(15));
+      const storiesSnapshot = await getDocs(storiesQuery);
+      setStories(storiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
       handleFirestoreError(err, OperationType.GET, 'posts');
     } finally {
@@ -136,6 +179,32 @@ export default function Home() {
     return () => { stopCamera(); };
   }, []);
 
+  const handleStoryImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && currentUser) {
+      const file = e.target.files[0];
+      setIsUploadingStory(true);
+      try {
+        const storageRef = ref(storage, `stories/${currentUser.uid}/${Date.now()}_${file.name}`);
+        const uploadResult = await uploadBytes(storageRef, file);
+        const imageUrl = await getDownloadURL(uploadResult.ref);
+        
+        await addDoc(collection(db, 'stories'), {
+          authorId: currentUser.uid,
+          authorName: userProfile?.name || 'User',
+          imageUrl: imageUrl,
+          createdAt: Date.now()
+        });
+        
+        await fetchPosts();
+      } catch (err: any) {
+        console.error(err);
+        alert('Failed to upload story');
+      } finally {
+        setIsUploadingStory(false);
+      }
+    }
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newPostContent.trim() && !selectedImage) || !currentUser) return;
@@ -164,7 +233,8 @@ export default function Home() {
       setNewPostContent('');
       clearImage();
       fetchPosts();
-    } catch (err) {
+    } catch (err: any) {
+      alert("Post error: " + (err.message || String(err)));
       handleFirestoreError(err, OperationType.CREATE, 'posts');
       setUploadProgress(-1);
     } finally {
@@ -176,56 +246,87 @@ export default function Home() {
     setPosts(posts.filter(p => p.id !== postId));
   };
 
-  const stories = [
-    { id: 1, name: "Moo Khu", grad: "from-[#D62828] to-[#1E3A8A]" },
-    { id: 2, name: "Design", grad: "from-[#1E3A8A] to-blue-400" },
-    { id: 3, name: "Loikaw", grad: "from-rose-400 to-[#D62828]" },
-    { id: 4, name: "Coding", grad: "from-[#D62828] to-blue-500" },
-    { id: 5, name: "Music", grad: "from-[#1E3A8A] to-[#D62828]" },
-  ];
+  const filteredPosts = posts.filter(post => 
+    post.content.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div 
+      className="flex flex-col gap-6 relative"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div 
+        className="absolute top-0 left-0 right-0 flex justify-center z-50 pointer-events-none transition-transform duration-200"
+        style={{ transform: `translateY(${Math.min(pullProgress, 80) - 50}px)`, opacity: pullProgress > 10 ? 1 : 0 }}
+      >
+        <div className={`bg-white dark:bg-slate-700 rounded-full shadow-lg p-2.5 flex items-center justify-center border border-slate-200 dark:border-slate-600 ${isRefreshing ? 'animate-spin' : ''}`}>
+           <RefreshCw className={`w-5 h-5 ${pullProgress > 80 ? 'text-[#D62828]' : 'text-slate-400'}`} style={{ transform: !isRefreshing ? `rotate(${pullProgress * 3}deg)` : undefined }}/>
+        </div>
+      </div>
+      
       <header className="px-2 pt-4 flex justify-between items-center">
         <div>
           <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">Good morning,</p>
           <h1 className="text-2xl font-bold tracking-tight">{userProfile?.name?.split(' ')[0] || 'Student'} 👋</h1>
         </div>
-        <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative">
-          {userProfile?.photoURL ? (
-            <img src={userProfile.photoURL} alt="Profile" className="w-full h-full object-cover" />
-          ) : (
-            <>
-              <svg className="w-5 h-5 text-slate-700 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full blur-[1px]"></span>
-            </>
-          )}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative">
+            {userProfile?.photoURL ? (
+              <img src={userProfile.photoURL} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <>
+                <svg className="w-5 h-5 text-slate-700 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full blur-[1px]"></span>
+              </>
+            )}
+          </div>
         </div>
       </header>
+      
+      {/* Search Bar */}
+      <div className="px-2">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-slate-400" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="block w-full pl-11 pr-4 py-3 border border-slate-200 dark:border-slate-700/50 rounded-2xl leading-5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 sm:text-sm shadow-sm transition-all"
+            placeholder="Search posts, people, or events..."
+          />
+        </div>
+      </div>
 
       {/* Stories / Highlights */}
       <div className="px-1">
+        <input type="file" ref={storyFileInputRef} hidden accept="image/*" onChange={handleStoryImageSelect} />
         <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide px-1 snap-x">
-          <div className="flex flex-col items-center gap-1.5 snap-center shrink-0">
-            <div className="w-16 h-16 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center bg-white dark:bg-slate-800 shadow-sm">
+          <div className="flex flex-col items-center gap-1.5 snap-center shrink-0 cursor-pointer" onClick={() => storyFileInputRef.current?.click()}>
+            <div className={`w-16 h-16 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center bg-white dark:bg-slate-800 shadow-sm ${isUploadingStory ? 'opacity-50 animate-pulse' : ''}`}>
                <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </div>
-            <span className="text-[10px] font-semibold text-slate-500">Add Story</span>
+            <span className="text-[10px] font-semibold text-slate-500">{isUploadingStory ? 'Uploading...' : 'Add Story'}</span>
           </div>
           {stories.map(story => (
             <div key={story.id} className="flex flex-col items-center gap-1.5 snap-center shrink-0">
-              <div className={`w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr ${story.grad}`}>
-                <div className="w-full h-full rounded-full border-2 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                  <div className="w-full h-full bg-white dark:bg-slate-700 opacity-50"></div>
+              <div className={`w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-[#D62828] to-[#1E3A8A]`}>
+                <div className="w-full h-full rounded-full border-2 border-white dark:border-slate-900 overflow-hidden relative">
+                  <img src={story.imageUrl} alt="Story" className="w-full h-full object-cover" />
                 </div>
               </div>
-              <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">{story.name}</span>
+              <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                {story.authorName?.split(' ')[0] || 'User'}
+              </span>
             </div>
           ))}
         </div>
       </div>
       
-      <form onSubmit={handleCreatePost} className="bg-white dark:bg-slate-800 rounded-[2rem] p-5 shadow-sm border border-slate-100 dark:border-slate-700/50 mx-1">
+      <form onSubmit={handleCreatePost} className="bg-slate-50/80 dark:bg-slate-800/40 rounded-[2rem] p-5 shadow-inner border border-slate-200/60 dark:border-slate-700/30 mx-1 backdrop-blur-sm">
         {uploadProgress === -1 && (
            <div className="bg-red-50 text-red-600 p-2 rounded-xl text-xs font-medium mb-3">Failed to post. Permission denied or error occurred.</div>
         )}
@@ -304,10 +405,10 @@ export default function Home() {
         <div className="flex justify-center py-12">
           <div className="w-8 h-8 rounded-full border-4 border-[#1E3A8A] dark:border-white border-t-transparent animate-spin"></div>
         </div>
-      ) : posts.length > 0 ? (
+      ) : filteredPosts.length > 0 ? (
         <div className="space-y-5 mx-1">
           <AnimatePresence>
-            {posts.map(post => (
+            {filteredPosts.map(post => (
               <PostCard key={post.id} post={post} onDelete={handleDeletePost} />
             ))}
           </AnimatePresence>

@@ -17,14 +17,30 @@ service cloud.firestore {
       return data.keys().hasAny(['name', 'username', 'createdAt', 'updatedAt']) 
         && data.name is string && data.name.size() > 0 && data.name.size() <= 100
         && data.username is string && data.username.size() > 0 && data.username.size() <= 50
-        && (data.get('school', '') is string && data.get('school', '').size() <= 100)
+        && (data.get('educationLevel', '') is string && data.get('educationLevel', '').size() <= 50)
+        && (data.get('school', '') is string && data.get('school', '').size() <= 150)
+        && (data.get('studentId', '') is string && data.get('studentId', '').size() <= 50)
+        && (data.get('educationDescription', '') is string && data.get('educationDescription', '').size() <= 1000)
         && (data.get('location', '') is string && data.get('location', '').size() <= 100)
-        && (data.get('bio', '') is string && data.get('bio', '').size() <= 500)
-        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 500)
-        && (data.get('interests', []) is list && data.get('interests', []).size() <= 20)
-        && (data.get('skills', []) is list && data.get('skills', []).size() <= 20)
+        && (data.get('bio', '') is string && data.get('bio', '').size() <= 1000)
+        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 1048487)
+        && (data.get('majorEthnicity', '') is string && data.get('majorEthnicity', '').size() <= 50)
+        && (data.get('subEthnicity', '') is string && data.get('subEthnicity', '').size() <= 100)
+        && (data.get('customEthnicity', '') is string && data.get('customEthnicity', '').size() <= 100)
+        && (data.get('interests', []) is list && data.get('interests', []).size() <= 50)
+        && (data.get('skills', []) is list && data.get('skills', []).size() <= 50)
         && data.createdAt is number
         && data.updatedAt is number;
+    }
+
+    match /stories/{storyId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && incoming().authorId == request.auth.uid
+        && incoming().keys().hasAll(['imageUrl', 'authorId', 'createdAt'])
+        && incoming().imageUrl is string
+        && incoming().createdAt is number;
+      allow delete: if isSignedIn() && existing().authorId == request.auth.uid;
     }
 
     match /users/{userId} {
@@ -39,6 +55,8 @@ service cloud.firestore {
         && request.auth.uid == userId
         && isValidUser(incoming())
         && incoming().createdAt == existing().createdAt;
+
+      allow delete: if isSignedIn();
     }
 
     function isValidSchool(data) {
@@ -46,7 +64,7 @@ service cloud.firestore {
         && data.name is string && data.name.size() > 0 && data.name.size() <= 150
         && (data.get('description', '') is string && data.get('description', '').size() <= 1000)
         && (data.get('clubs', []) is list && data.get('clubs', []).size() <= 50)
-        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 500)
+        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 1048487)
         && (data.get('studentCount', 0) is number)
         && data.ownerId is string && data.ownerId == request.auth.uid
         && data.createdAt is number;
@@ -84,10 +102,10 @@ service cloud.firestore {
     function isValidPost(data) {
       return data.keys().hasAny(['authorId', 'content', 'postType', 'createdAt'])
         && data.authorId is string && data.authorId == request.auth.uid
-        && data.content is string && data.content.size() > 0 && data.content.size() <= 2000
+        && data.content is string && data.content.size() <= 2000
         && (data.get('title', '') is string && data.get('title', '').size() <= 150)
         && data.postType is string && data.postType in ['simple', 'showcase']
-        && (data.get('mediaURL', '') is string && data.get('mediaURL', '').size() <= 500)
+        && (data.get('mediaURL', '') is string && data.get('mediaURL', '').size() <= 1048487)
         && data.createdAt is number
         && (data.get('likesCount', 0) is number)
         && (data.get('commentsCount', 0) is number);
@@ -170,6 +188,7 @@ service cloud.firestore {
          allow create: if isSignedIn() 
            && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
            && incoming().authorId == request.auth.uid;
+         allow update: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
          allow delete: if isSignedIn() && existing().authorId == request.auth.uid;
       }
     }

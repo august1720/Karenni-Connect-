@@ -7,9 +7,12 @@ export async function uploadMedia(
   path: string, 
   onProgress?: (progress: number) => void
 ): Promise<string> {
+  // We use base64 strings stored in Firestore since Firebase Storage
+  // might not be provisioned in this environment. 
+  // We compress aggressively to fit within Firestore's 1MB document limit.
   const options = {
-    maxSizeMB: 1,
-    maxWidthOrHeight: 1200,
+    maxSizeMB: 0.7,
+    maxWidthOrHeight: 1000,
     useWebWorker: true,
   };
   
@@ -22,26 +25,15 @@ export async function uploadMedia(
     }
   }
 
-  const fileExtension = compressedFile.name.split('.').pop() || 'png';
-  const fileName = `${crypto.randomUUID()}.${fileExtension}`;
-  const storageRef = ref(storage, `${path}/${fileName}`);
-  
-  const uploadTask = uploadBytesResumable(storageRef, compressedFile);
+  if (onProgress) onProgress(50); // Simulated progress
 
   return new Promise((resolve, reject) => {
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        if (onProgress) onProgress(progress);
-      },
-      (error) => {
-        reject(error);
-      },
-      async () => {
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        resolve(downloadURL);
-      }
-    );
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (onProgress) onProgress(100);
+      resolve(reader.result as string);
+    };
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(compressedFile);
   });
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { Button } from '../components/ui/Button';
@@ -10,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
   const { userProfile, currentUser } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [postsCount, setPostsCount] = useState(0);
@@ -41,7 +43,7 @@ export default function Profile() {
   return (
     <div className="flex flex-col gap-6 pt-4 pb-12">
       <div className="flex items-center justify-between px-2">
-        <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t("Profile")}</h1>
         <button onClick={() => navigate('/settings')} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
           <SettingsIcon className="w-5 h-5" />
         </button>
@@ -77,15 +79,15 @@ export default function Profile() {
               <div className="flex gap-6 mt-4 pb-2 border-b border-slate-100 dark:border-slate-700/50 w-full justify-center">
                 <div className="text-center">
                   <span className="block font-bold text-lg text-slate-900 dark:text-white">{postsCount}</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Posts</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{t("Posts")}</span>
                 </div>
                 <div className="text-center">
                   <span className="block font-bold text-lg text-slate-900 dark:text-white">{followersCount}</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Followers</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{t("Followers")}</span>
                 </div>
                 <div className="text-center">
                   <span className="block font-bold text-lg text-slate-900 dark:text-white">{followingCount}</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Following</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{t("Following")}</span>
                 </div>
               </div>
             </div>
@@ -95,9 +97,9 @@ export default function Profile() {
                 <div className="flex gap-3 text-sm">
                   <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">🎓</div>
                   <div className="pt-1">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">Education ({userProfile.educationLevel})</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">{t("Education")} ({userProfile.educationLevel})</p>
                     <p className="text-slate-500">
-                      {userProfile.school || 'Not specified'} 
+                      {userProfile.school || t('Not specified')} 
                       {userProfile.studentId ? ` | ID: ${userProfile.studentId}` : ''}
                       {userProfile.educationDescription ? ` | ${userProfile.educationDescription}` : ''}
                     </p>
@@ -107,15 +109,15 @@ export default function Profile() {
               <div className="flex gap-3 text-sm">
                 <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">📍</div>
                 <div className="pt-1">
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">Location</p>
-                  <p className="text-slate-500">{userProfile.location || 'Not specified'}</p>
+                  <p className="font-semibold text-slate-900 dark:text-slate-100">{t("Location")}</p>
+                  <p className="text-slate-500">{userProfile.location || t('Not specified')}</p>
                 </div>
               </div>
               {(userProfile.majorEthnicity || userProfile.customEthnicity) && (
                 <div className="flex gap-3 text-sm">
                   <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">🌍</div>
                   <div className="pt-1">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">Ethnicity</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">{t("Ethnicity")}</p>
                     <p className="text-slate-500">
                       {userProfile.majorEthnicity === 'Others' || userProfile.subEthnicity === 'Others' 
                         ? userProfile.customEthnicity 
@@ -135,21 +137,21 @@ export default function Profile() {
               )}
               
               <div className="pt-4 border-t border-slate-100 dark:border-slate-700/50">
-                <strong className="text-slate-900 dark:text-slate-100 text-sm block mb-3 font-semibold text-center uppercase tracking-wider text-[10px]">Interests & Skills</strong>
+                <strong className="text-slate-900 dark:text-slate-100 text-sm block mb-3 font-semibold text-center uppercase tracking-wider text-[10px]">{t("Interests & Skills")}</strong>
                 <div className="flex flex-wrap justify-center gap-2">
                   {userProfile.interests?.map(i => (
                     <span key={i} className="px-4 py-1.5 bg-slate-100 dark:bg-[#D62828]/10 text-slate-700 dark:text-[#FCA5A5] border border-slate-200 dark:border-[#D62828]/20 text-xs font-semibold rounded-full shadow-sm">{i}</span>
-                  )) || <span className="text-slate-500 ml-1">None</span>}
+                  )) || <span className="text-slate-500 ml-1">{t("Not specified")}</span>}
                 </div>
               </div>
             </div>
             
             <div className="mt-8 flex gap-3">
-              <Button className="flex-1 rounded-2xl" variant="primary" onClick={() => setIsEditModalOpen(true)}>Edit Profile</Button>
+              <Button className="flex-1 rounded-2xl" variant="primary" onClick={() => setIsEditModalOpen(true)}>{t("Edit Profile")}</Button>
             </div>
           </div>
           
-          <h2 className="text-xl font-bold tracking-tight px-1 mb-4">Showcase</h2>
+          <h2 className="text-xl font-bold tracking-tight px-1 mb-4">{t("Showcase")}</h2>
           
           <div className="grid grid-cols-2 gap-3">
              <div className="bg-slate-200 dark:bg-slate-800 h-48 rounded-[2rem] overflow-hidden relative group cursor-pointer shadow-sm">

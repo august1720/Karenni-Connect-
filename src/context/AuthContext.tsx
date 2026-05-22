@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { User as UserProfile } from '../types';
 
@@ -67,6 +67,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!currentUser || !userProfile) return;
+
+    const updatePresence = async () => {
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, {
+          lastSeen: Date.now()
+        });
+      } catch (err) {
+        console.error('Error updating presence lastSeen:', err);
+      }
+    };
+
+    updatePresence();
+    const interval = setInterval(updatePresence, 45000); // 45 seconds
+
+    return () => clearInterval(interval);
+  }, [currentUser, !!userProfile]);
 
   return (
     <AuthContext.Provider value={{ currentUser, userProfile, loading, refreshProfile }}>

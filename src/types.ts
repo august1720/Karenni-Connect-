@@ -14,9 +14,11 @@ export interface User {
   customEthnicity?: string;
   interests?: string[];
   skills?: string[];
+  isVerified?: boolean;
   visibility?: Record<string, 'public' | 'private'>;
   createdAt: number;
   updatedAt: number;
+  lastSeen?: number;
   settings?: {
     theme?: string;
     language?: string;

@@ -6,6 +6,20 @@ import { collection, query, where, getCountFromServer, doc, getDoc, setDoc, dele
 import { motion } from 'framer-motion';
 import { User } from '../types';
 
+const formatLastSeen = (timestamp?: number) => {
+  if (!timestamp) return '';
+  const diff = Date.now() - timestamp;
+  const secs = Math.floor(diff / 1000);
+  if (secs < 60) return 'just now';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'yesterday';
+  return `${days} days ago`;
+};
+
 export default function UserProfile() {
   const { id } = useParams<{ id: string }>();
   const { currentUser } = useAuth();
@@ -132,12 +146,34 @@ export default function UserProfile() {
                   {profile.name.charAt(0).toUpperCase()}
                 </div>
               )}
+              {profile.lastSeen && (Date.now() - profile.lastSeen < 120000) && (
+                <div className="absolute bottom-1 right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-white dark:border-slate-800 flex items-center justify-center shadow-md shadow-emerald-500/30" title="Active now">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping absolute duration-1000"></div>
+                  <div className="w-1.5 h-1.5 bg-white rounded-full relative z-10"></div>
+                </div>
+              )}
             </div>
             <div className="space-y-1 mt-2">
               <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center justify-center gap-2">
                 {profile.name}
               </h2>
-              <p className="text-slate-500 font-medium pb-2">@{profile.username}</p>
+              <div className="flex flex-col items-center gap-1.5 pb-2">
+                <p className="text-slate-500 font-medium">@{profile.username}</p>
+                {profile.lastSeen ? (
+                  Date.now() - profile.lastSeen < 120000 ? (
+                    <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 shadow-sm animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      Active now
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 font-medium">
+                      Active {formatLastSeen(profile.lastSeen)}
+                    </p>
+                  )
+                ) : (
+                  <p className="text-[11px] text-slate-400 font-medium">Offline</p>
+                )}
+              </div>
               
               {currentUser && currentUser.uid !== id && (
                 <button

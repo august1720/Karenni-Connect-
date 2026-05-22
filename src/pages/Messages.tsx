@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useParams, useMatch } from 'react-router-do
 import { collection, query, orderBy, getDocs, doc, setDoc, onSnapshot, where, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useUserData } from '../hooks/useUserData';
 import { motion } from 'framer-motion';
 import { Send, Image as ImageIcon, ArrowLeft, Video, Settings, Search, Check, CheckCheck, X } from 'lucide-react';
@@ -29,6 +30,7 @@ interface Message {
 
 function ChatList() {
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const [chats, setChats] = useState<Chat[]>([]);
   const navigate = useNavigate();
 
@@ -60,12 +62,12 @@ function ChatList() {
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] dark:bg-[#0F172A] pt-4 px-2 pb-24">
-      <h1 className="text-3xl font-bold tracking-tight px-2 mb-4">Messages</h1>
+      <h1 className="text-3xl font-bold tracking-tight px-2 mb-4">{t("Messages")}</h1>
       <div className="space-y-2">
         {chats.length > 0 ? chats.map(chat => (
           <ChatItem key={chat.id} chat={chat} onClick={() => navigate(`/messages/${chat.id}`)} />
         )) : (
-          <p className="text-center text-slate-500 mt-8 text-sm">No messages yet. Start a chat from a user's profile!</p>
+          <p className="text-center text-slate-500 mt-8 text-sm">{t("No messages yet. Start a chat from a user's profile!")}</p>
         )}
       </div>
     </div>
@@ -84,13 +86,18 @@ function ChatItem({ chat, onClick }: { key?: React.Key, chat: Chat, onClick: () 
       onClick={onClick}
       className="bg-white dark:bg-slate-800 p-4 rounded-[1.5rem] flex items-center gap-4 cursor-pointer shadow-sm border border-slate-100 dark:border-slate-700/50"
     >
-      {otherUser?.photoURL ? (
-        <img src={otherUser.photoURL} alt={otherUser.name} className="w-12 h-12 rounded-full object-cover shrink-0" />
-      ) : (
-        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#1E3A8A] to-[#D62828] text-white flex items-center justify-center font-bold text-lg shrink-0">
-          {otherUser?.name?.charAt(0).toUpperCase() || 'U'}
-        </div>
-      )}
+      <div className="relative shrink-0">
+        {otherUser?.photoURL ? (
+          <img src={otherUser.photoURL} alt={otherUser.name} className="w-12 h-12 rounded-full object-cover" />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#1E3A8A] to-[#D62828] text-white flex items-center justify-center font-bold text-lg">
+            {otherUser?.name?.charAt(0).toUpperCase() || 'U'}
+          </div>
+        )}
+        {otherUser?.lastSeen && (Date.now() - otherUser.lastSeen < 120000) && (
+          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-800 shadow-sm" title="Active now"></span>
+        )}
+      </div>
       <div className="flex-1 min-w-0">
         <h3 className="font-semibold text-slate-900 dark:text-white truncate">{otherUser?.name || 'Loading...'}</h3>
         <p className="text-sm text-slate-500 truncate">{chat.lastMessage || 'Sent a media'}</p>
@@ -112,6 +119,7 @@ function ChatItem({ chat, onClick }: { key?: React.Key, chat: Chat, onClick: () 
 function ChatRoom() {
   const { chatId } = useParams();
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
@@ -213,15 +221,42 @@ function ChatRoom() {
             <ArrowLeft className="w-5 h-5 text-slate-700 dark:text-slate-300" />
           </button>
           
-          <div className="flex items-center gap-2">
-            {otherUser?.photoURL ? (
-              <img src={otherUser.photoURL} alt="pfp" className="w-9 h-9 rounded-full object-cover" />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500">
-                {otherUser?.name?.charAt(0) || 'U'}
-              </div>
-            )}
-            <h2 className="font-semibold text-slate-900 dark:text-white">{otherUser?.name || 'Loading...'}</h2>
+          <div className="flex items-center gap-2.5">
+            <div className="relative shrink-0">
+              {otherUser?.photoURL ? (
+                <img src={otherUser.photoURL} alt="pfp" className="w-9 h-9 rounded-full object-cover" />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500">
+                  {otherUser?.name?.charAt(0) || 'U'}
+                </div>
+              )}
+              {otherUser?.lastSeen && (Date.now() - otherUser.lastSeen < 120000) && (
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-800" title="Active now"></span>
+              )}
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900 dark:text-white leading-tight">{otherUser?.name || 'Loading...'}</h2>
+              <p className="text-[10px] font-semibold text-slate-500">
+                {otherUser?.lastSeen ? (
+                  Date.now() - otherUser.lastSeen < 120000 ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 animate-pulse">{t("Active now")}</span>
+                  ) : (
+                    `${t("Active now")} ${(() => {
+                      const diff = Date.now() - otherUser.lastSeen;
+                      const secs = Math.floor(diff / 1000);
+                      if (secs < 60) return t('just now');
+                      const mins = Math.floor(secs / 60);
+                      if (mins < 60) return `${mins}m ago`;
+                      const hours = Math.floor(mins / 60);
+                      if (hours < 24) return `${hours}h ago`;
+                      return new Date(otherUser.lastSeen).toLocaleDateString();
+                    })()}`
+                  )
+                ) : (
+                  t('offline')
+                )}
+              </p>
+            </div>
           </div>
         </div>
         <button onClick={() => setShowVideoCall(true)} className="p-2 rounded-full bg-slate-100 dark:bg-slate-700 text-[#1E3A8A] dark:text-blue-400 hover:bg-slate-200 transition-colors">
@@ -271,7 +306,7 @@ function ChatRoom() {
           </label>
           <input 
             type="text" 
-            placeholder="Type a message..." 
+            placeholder={t("Type a message...")} 
             value={text} onChange={e => setText(e.target.value)}
             className="flex-1 bg-slate-100 dark:bg-slate-700/50 px-4 py-3 rounded-full text-[15px] outline-none focus:ring-2 focus:ring-[#1E3A8A] transition-all border border-transparent dark:border-slate-700 min-w-0"
           />

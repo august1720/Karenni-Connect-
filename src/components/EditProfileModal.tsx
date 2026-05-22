@@ -6,6 +6,8 @@ import { db } from '../lib/firebase';
 import { uploadMedia } from '../lib/storage';
 import { Button } from './ui/Button';
 import { X, Image as ImageIcon } from 'lucide-react';
+import { ImageCropper } from './ImageCropper';
+import { useLanguage } from '../context/LanguageContext';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -52,6 +54,7 @@ const VisibilityToggle = ({ label, value, onChange }: { label: string, value: Vi
 
 export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const { userProfile, currentUser, refreshProfile } = useAuth();
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     name: userProfile?.name || '',
     username: userProfile?.username || '',
@@ -77,6 +80,7 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
     }
   );
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [croppingImage, setCroppingImage] = useState<string | null>(null);
 
   const handleVisibilityChange = (field: string, val: 'public' | 'private') => {
     setVisibility(prev => ({ ...prev, [field]: val }));
@@ -91,9 +95,8 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSelectedPhoto(file);
-      setPhotoPreview(URL.createObjectURL(file));
-      setUploadProgress(0);
+      setCroppingImage(URL.createObjectURL(file));
+      e.target.value = '';
     }
   };
 
@@ -283,6 +286,18 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
           </div>
         </motion.div>
       </motion.div>
+      {croppingImage && (
+        <ImageCropper 
+          imageSrc={croppingImage}
+          onCrop={(croppedFile) => {
+            setSelectedPhoto(croppedFile);
+            setPhotoPreview(URL.createObjectURL(croppedFile));
+            setCroppingImage(null);
+            setUploadProgress(0);
+          }}
+          onCancel={() => setCroppingImage(null)}
+        />
+      )}
     </AnimatePresence>
     </>
   );

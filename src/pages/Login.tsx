@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
-import { Button } from '../components/ui/Button'; // I'll create this later
+import { Button } from '../components/ui/Button';
+import { useLanguage } from '../context/LanguageContext';
+import { Globe } from 'lucide-react';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -11,6 +13,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { t, language, changeLanguage } = useLanguage();
 
   const handleGoogleSignIn = async () => {
     try {
@@ -43,21 +46,52 @@ export default function Login() {
     }
   };
 
+  const toggleLanguage = () => {
+    changeLanguage(language === 'en' ? 'my' : 'en');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F7FB] dark:bg-[#0F172A] p-4 relative overflow-hidden">
+      {/* Floating Language Switcher */}
+      <div className="absolute top-6 right-6 z-50">
+        <button
+          onClick={toggleLanguage}
+          className="flex items-center gap-2 bg-white/85 dark:bg-slate-800/85 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-sm border border-slate-200/65 dark:border-slate-700/50 hover:shadow transition-all group scale-95 hover:scale-100"
+        >
+          <Globe className="w-4 h-4 text-slate-500 group-hover:text-[#D62828] transition-colors" />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+            {language === 'en' ? 'မြန်မာ' : 'English'}
+          </span>
+        </button>
+      </div>
+
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-[#D62828]/20 dark:bg-[#D62828]/10 rounded-full blur-[80px] pointer-events-none mix-blend-multiply dark:mix-blend-screen"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-[#1E3A8A]/20 dark:bg-[#1E3A8A]/10 rounded-full blur-[80px] pointer-events-none mix-blend-multiply dark:mix-blend-screen"></div>
       
       <div className="max-w-md w-full space-y-8 bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700/50 relative z-10">
         <div className="text-center">
-          <div className="w-20 h-20 bg-gradient-to-tr from-[#D62828] to-[#1E3A8A] rounded-[1.5rem] mx-auto flex items-center justify-center shadow-lg shadow-[#D62828]/20 dark:shadow-none mb-6">
-             <span className="text-white font-bold text-4xl tracking-tighter">K</span>
+          <div className="w-24 h-24 bg-white dark:bg-slate-700 rounded-3xl mx-auto flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow mb-6 overflow-hidden border border-slate-100/80 dark:border-slate-600/50">
+            <img 
+              src="/icon.png" 
+              alt="Logo" 
+              className="w-full h-full object-cover" 
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const parent = e.currentTarget.parentElement;
+                if (parent && !parent.querySelector('.fallback-logo')) {
+                  const fallback = document.createElement('div');
+                  fallback.className = "fallback-logo w-full h-full bg-gradient-to-tr from-[#D62828] to-[#1E3A8A] flex items-center justify-center font-bold text-white text-3xl";
+                  fallback.innerText = "K";
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
           </div>
           <h2 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-            Karenni Youth Hub
+            {t("Karenni Youth Hub")}
           </h2>
-          <p className="mt-2 text-sm text-slate-500 font-medium">
-            Connect, learn, and grow together.
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+            {t("Connect, learn, and grow together.")}
           </p>
         </div>
 
@@ -72,20 +106,20 @@ export default function Login() {
             <div>
               <input
                 type="email"
-                placeholder="Email address"
+                placeholder={t("Email address")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-5 py-4 rounded-[1.25rem] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#D62828] transition-all font-medium"
+                className="w-full px-5 py-4 rounded-[1.25rem] bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#D62828] transition-all font-medium"
                 required
               />
             </div>
             <div>
               <input
                 type="password"
-                placeholder="Password"
+                placeholder={t("Password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-5 py-4 rounded-[1.25rem] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#D62828] transition-all font-medium"
+                className="w-full px-5 py-4 rounded-[1.25rem] bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#D62828] transition-all font-medium"
                 required
               />
             </div>
@@ -95,7 +129,7 @@ export default function Login() {
               size="lg"
               disabled={loading}
             >
-              {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Sign Up'}
+              {loading ? t('Processing...') : isLogin ? t('Sign In') : t('Sign Up')}
             </Button>
           </form>
 
@@ -104,7 +138,9 @@ export default function Login() {
               <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-white dark:bg-slate-800 text-slate-500 font-medium">Or continue with</span>
+              <span className="px-3 bg-white dark:bg-slate-800 text-slate-500 font-medium">
+                {t("Or continue with")}
+              </span>
             </div>
           </div>
 
@@ -126,10 +162,11 @@ export default function Login() {
 
           <div className="text-center pt-2">
             <button
+              type="button"
               onClick={() => setIsLogin(!isLogin)}
               className="text-sm font-semibold text-slate-900 dark:text-white hover:text-[#D62828] dark:hover:text-[#FCA5A5] transition-colors"
             >
-              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+              {isLogin ? t("Don't have an account? Sign up") : t("Already have an account? Sign in")}
             </button>
           </div>
         </div>

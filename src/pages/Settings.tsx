@@ -17,7 +17,7 @@ import { collection, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
 export default function Settings() {
   const { userProfile, currentUser } = useAuth();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language, changeLanguage } = useLanguage();
   const [theme, setTheme] = useState(userProfile?.settings?.theme || localStorage.getItem('theme') || 'system');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(Notification.permission === 'granted');
@@ -159,7 +159,7 @@ export default function Settings() {
         <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t("Settings")}</h1>
       </div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -168,12 +168,12 @@ export default function Settings() {
         <Section title={t("Account")}>
           <ActionRow 
             icon={User} color="bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-            title={t("Edit Profile")} subtitle="Update your name, bio, photo & location"
+            title={t("Edit Profile")} subtitle={t("Update your name, bio, photo & location")}
             onClick={() => setIsEditModalOpen(true)}
           />
           <ActionRow 
             icon={Key} color="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-            title="Change Password" subtitle={resetSent ? 'Reset link sent to email' : 'Send password reset email'}
+            title={t("Change Password")} subtitle={resetSent ? t('Reset link sent to email') : t('Send password reset email')}
             onClick={handlePasswordReset}
           />
         </Section>
@@ -236,9 +236,9 @@ export default function Settings() {
             title={t("App Language")} subtitle="English, Myanmar"
             rightContent={
               <select 
-                className="bg-transparent text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none border-none cursor-pointer p-0"
-                value={userProfile?.settings?.language || 'en'}
-                onChange={(e) => updateSetting('settings.language', e.target.value)}
+                className="bg-transparent text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none border-none cursor-pointer p-1"
+                value={language || 'en'}
+                onChange={(e) => changeLanguage(e.target.value as any)}
               >
                 <option value="en">English</option>
                 <option value="my">Myanmar</option>
@@ -317,7 +317,7 @@ export default function Settings() {
            <button onClick={() => setDeleteConfirmOpen(true)} className="w-full rounded-xl p-3 flex items-center justify-between gap-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/10 transition-colors font-medium">
              <div className="flex items-center gap-3">
                 <Trash2 className="w-5 h-5" />
-                <span className="text-left">Delete Account</span>
+                <span className="text-left">{t("Delete Account")}</span>
              </div>
            </button>
           </div>
@@ -326,7 +326,7 @@ export default function Settings() {
         <section>
            <button onClick={() => auth.signOut()} className="w-full bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 flex items-center justify-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors font-semibold">
              <LogOut className="w-5 h-5" />
-             Sign Out
+             {t("Log Out")}
            </button>
         </section>
       </motion.div>
@@ -344,16 +344,16 @@ export default function Settings() {
               <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-600 flex items-center justify-center mb-4 mx-auto">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">Delete Account?</h3>
-              <p className="text-slate-500 text-center text-sm mb-6">
-                Are you sure? This will permanently delete your profile, posts, messages, and settings. This cannot be undone.
+              <h3 className="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">{t("Delete Account")}</h3>
+              <p className="text-slate-500 text-center text-sm mb-6 leading-relaxed">
+                {t("Are you sure? This will permanently delete your profile, posts, messages, and settings. This cannot be undone.")}
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setDeleteConfirmOpen(false)} className="flex-1 py-3 rounded-xl font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600 transition-colors">
-                  Cancel
+                  {t("Cancel")}
                 </button>
-                <button onClick={handleDeleteAccount} className="flex-1 py-3 rounded-xl font-semibold text-white bg-rose-500 hover:bg-rose-600 transition-colors shadow-sm shadow-rose-500/20">
-                  Delete
+                <button onClick={handleDeleteAccount} className="flex-1 py-3 rounded-xl font-semibold text-white bg-rose-500 hover:bg-rose-600 transition-colors shadow-sm shadow-rose-500/20 animate-pulse">
+                  {t("Delete")}
                 </button>
               </div>
             </motion.div>

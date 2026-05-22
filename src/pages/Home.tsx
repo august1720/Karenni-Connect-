@@ -1,17 +1,20 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, limit, getDocs, doc, setDoc, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, setDoc, addDoc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, storage } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Post } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Button } from '../components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PostCard } from '../components/PostCard';
 import { uploadMedia } from '../lib/storage';
 import { Image, X, Video, StopCircle, RefreshCw, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Home() {
   const { userProfile, currentUser } = useAuth();
+  const { t } = useLanguage();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
@@ -33,6 +36,11 @@ export default function Home() {
   const [stories, setStories] = useState<any[]>([]);
   const storyFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingStory, setIsUploadingStory] = useState(false);
+
+  const navigate = useNavigate();
+  const [authorsMap, setAuthorsMap] = useState<Record<string, any>>({});
+  const [matchedUsers, setMatchedUsers] = useState<any[]>([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
 
   const [pullProgress, setPullProgress] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -73,6 +81,23 @@ export default function Home() {
       const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20));
       const snapshot = await getDocs(postsQuery);
       const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+      
+      // Resolve authors for filtering
+      const uniqueAuthorIds = Array.from(new Set(fetchedPosts.map(p => p.authorId)));
+      const resolvedAuthors: Record<string, any> = {};
+      await Promise.all(
+        uniqueAuthorIds.map(async (authorId) => {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', authorId));
+            if (userDoc.exists()) {
+              resolvedAuthors[authorId] = userDoc.data();
+            }
+          } catch (e) {
+            console.error("Error fetching author details:", e);
+          }
+        })
+      );
+      setAuthorsMap(resolvedAuthors);
       setPosts(fetchedPosts);
 
       const storiesQuery = query(collection(db, 'stories'), orderBy('createdAt', 'desc'), limit(15));
@@ -84,6 +109,37 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setMatchedUsers([]);
+      return;
+    }
+    
+    const searchUsers = async () => {
+      setSearchingUsers(true);
+      try {
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const fetched = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const lowerQuery = searchQuery.toLowerCase();
+        const filtered = fetched.filter((u: any) => 
+          u.name?.toLowerCase().includes(lowerQuery) || 
+          u.username?.toLowerCase().includes(lowerQuery)
+        );
+        setMatchedUsers(filtered);
+      } catch (err) {
+        console.error("Error searching users:", err);
+      } finally {
+        setSearchingUsers(false);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      searchUsers();
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     fetchPosts();
@@ -246,9 +302,16 @@ export default function Home() {
     setPosts(posts.filter(p => p.id !== postId));
   };
 
-  const filteredPosts = posts.filter(post => 
-    post.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredPosts = posts.filter(post => {
+    const author = authorsMap[post.authorId];
+    const authorName = author?.name?.toLowerCase() || '';
+    const authorUsername = author?.username?.toLowerCase() || '';
+    const query = searchQuery.toLowerCase().trim();
+    
+    return post.content.toLowerCase().includes(query) || 
+      authorName.includes(query) || 
+      authorUsername.includes(query);
+  });
 
   return (
     <div 
@@ -268,8 +331,8 @@ export default function Home() {
       
       <header className="px-2 pt-4 flex justify-between items-center">
         <div>
-          <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">Good morning,</p>
-          <h1 className="text-2xl font-bold tracking-tight">{userProfile?.name?.split(' ')[0] || 'Student'} 👋</h1>
+          <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">{t("Good morning,")}</p>
+          <h1 className="text-2xl font-bold tracking-tight">{userProfile?.name?.split(' ')[0] || t('Student')} 👋</h1>
         </div>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative">
@@ -296,10 +359,54 @@ export default function Home() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="block w-full pl-11 pr-4 py-3 border border-slate-200 dark:border-slate-700/50 rounded-2xl leading-5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 sm:text-sm shadow-sm transition-all"
-            placeholder="Search posts, people, or events..."
+            placeholder={t("Search posts, people, or events...")}
           />
         </div>
       </div>
+
+      {searchQuery.trim() && (
+        <div className="px-2">
+          <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 select-none">
+            {t("People")} {searchingUsers ? "..." : `(${matchedUsers.length})`}
+          </h3>
+          {searchingUsers ? (
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="flex flex-col items-center gap-1.5 p-3.5 bg-white dark:bg-slate-800 rounded-[1.5rem] border border-slate-100 dark:border-slate-700/50 shadow-sm shrink-0 w-24 animate-pulse select-none">
+                  <div className="w-11 h-11 rounded-full bg-slate-200 dark:bg-slate-700" />
+                  <div className="h-2.5 w-12 bg-slate-200 dark:bg-slate-700 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : matchedUsers.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide snap-x">
+              {matchedUsers.map(user => (
+                <div 
+                  key={user.id} 
+                  onClick={() => navigate(`/user/${user.id}`)}
+                  className="flex flex-col items-center gap-1.5 p-3.5 bg-white dark:bg-slate-800 rounded-[1.5rem] border border-slate-100 dark:border-slate-700/50 shadow-sm shrink-0 cursor-pointer hover:border-[#D62828]/50 dark:hover:border-[#D62828]/50 transition-colors w-24 text-center snap-center"
+                >
+                  {user.photoURL ? (
+                    <img referrerPolicy="no-referrer" src={user.photoURL} alt={user.name} className="w-11 h-11 rounded-full object-cover shadow-sm bg-slate-50" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-[#D62828] to-[#1E3A8A] flex items-center justify-center text-white font-bold shadow-sm text-sm">
+                      {user.name?.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate w-full">
+                    {user.name}
+                  </span>
+                  <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold truncate w-full uppercase tracking-wider">
+                    @{user.username || 'user'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 py-1.5 select-none">{t("No users match your search.")}</p>
+          )}
+        </div>
+      )}
 
       {/* Stories / Highlights */}
       <div className="px-1">
@@ -309,7 +416,7 @@ export default function Home() {
             <div className={`w-16 h-16 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center bg-white dark:bg-slate-800 shadow-sm ${isUploadingStory ? 'opacity-50 animate-pulse' : ''}`}>
                <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </div>
-            <span className="text-[10px] font-semibold text-slate-500">{isUploadingStory ? 'Uploading...' : 'Add Story'}</span>
+            <span className="text-[10px] font-semibold text-slate-500">{isUploadingStory ? t('Uploading...') : t('Add Story')}</span>
           </div>
           {stories.map(story => (
             <div key={story.id} className="flex flex-col items-center gap-1.5 snap-center shrink-0">
@@ -328,7 +435,7 @@ export default function Home() {
       
       <form onSubmit={handleCreatePost} className="bg-slate-50/80 dark:bg-slate-800/40 rounded-[2rem] p-5 shadow-inner border border-slate-200/60 dark:border-slate-700/30 mx-1 backdrop-blur-sm">
         {uploadProgress === -1 && (
-           <div className="bg-red-50 text-red-600 p-2 rounded-xl text-xs font-medium mb-3">Failed to post. Permission denied or error occurred.</div>
+           <div className="bg-red-50 text-red-600 p-2 rounded-xl text-xs font-medium mb-3">{t("Failed to post. Permission denied or error occurred.")}</div>
         )}
         <div className="flex gap-3 items-start">
           {userProfile?.photoURL ? (
@@ -342,7 +449,7 @@ export default function Home() {
             <textarea
               value={newPostContent}
               onChange={(e) => setNewPostContent(e.target.value)}
-              placeholder="What's on your mind?"
+              placeholder={t("What's on your mind?")}
               className="w-full bg-transparent resize-none border-none focus:ring-0 text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-none font-medium text-base pt-2"
               rows={2}
             />
@@ -396,7 +503,7 @@ export default function Home() {
             </button>
           </div>
           <Button type="submit" size="sm" disabled={(!newPostContent.trim() && !selectedImage) || isSubmitting} className="rounded-full px-5 h-9 bg-gradient-to-r from-[#D62828] to-[#1E3A8A] text-white hover:opacity-90 shadow-sm text-sm border-0 disabled:opacity-50 min-w-[5rem]">
-            {isSubmitting ? (uploadProgress > 0 && uploadProgress < 100 ? `${Math.round(uploadProgress)}%` : 'Posting...') : 'Post'}
+            {isSubmitting ? (uploadProgress > 0 && uploadProgress < 100 ? `${Math.round(uploadProgress)}%` : t('Posting...')) : t('Post')}
           </Button>
         </div>
       </form>
@@ -415,7 +522,7 @@ export default function Home() {
         </div>
       ) : (
         <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-100 dark:border-slate-700/50 shadow-sm mx-1">
-          <p className="text-slate-500 font-medium">No updates yet.</p>
+          <p className="text-slate-500 font-medium">{t("No updates yet.")}</p>
         </div>
       )}
     </div>

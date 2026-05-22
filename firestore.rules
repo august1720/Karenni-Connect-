@@ -29,6 +29,9 @@ service cloud.firestore {
         && (data.get('customEthnicity', '') is string && data.get('customEthnicity', '').size() <= 100)
         && (data.get('interests', []) is list && data.get('interests', []).size() <= 50)
         && (data.get('skills', []) is list && data.get('skills', []).size() <= 50)
+        && (data.get('lastSeen', 0) is number)
+        && (data.get('settings', {}) is map)
+        && (data.get('visibility', {}) is map)
         && data.createdAt is number
         && data.updatedAt is number;
     }
@@ -41,6 +44,15 @@ service cloud.firestore {
         && incoming().imageUrl is string
         && incoming().createdAt is number;
       allow delete: if isSignedIn() && existing().authorId == request.auth.uid;
+    }
+
+    match /reactions/{reactionId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn()
+        && request.auth.uid == incoming().userId
+        && incoming().keys().hasAll(['userId', 'postId', 'emoji', 'createdAt'])
+        && incoming().userId == request.auth.uid;
+      allow delete: if isSignedIn() && request.auth.uid == existing().userId;
     }
 
     match /users/{userId} {

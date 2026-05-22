@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Post } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useUserData } from '../hooks/useUserData';
 import { doc, getDoc, deleteDoc, runTransaction, setDoc, collection, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -36,64 +37,152 @@ export function formatRelativeTime(date: number) {
 
 export function PostCard({ post, onDelete }: PostCardProps) {
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const author = useUserData(post.authorId);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likesCount || 0);
+  const [userReaction, setUserReaction] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [showComments, setShowComments] = useState(false);
   
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
 
+  const [showReactionsPop, setShowReactionsPop] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [touchTimeout, setTouchTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  const REACTION_EMOJIS = [
+    { emoji: '👍', label: 'Like' },
+    { emoji: '❤️', label: 'Love' },
+    { emoji: '😂', label: 'Haha' },
+    { emoji: '😮', label: 'Wow' },
+    { emoji: '😢', label: 'Sad' },
+    { emoji: '🔥', label: 'Fire' }
+  ];
+
   useEffect(() => {
     if (!currentUser) return;
-    const checkLike = async () => {
-      const likeRef = doc(db, 'posts', post.id, 'likes', currentUser.uid);
-      const snap = await getDoc(likeRef);
-      setIsLiked(snap.exists());
+    const checkUserReaction = async () => {
+      try {
+        const reactionRef = doc(db, 'reactions', `${post.id}_${currentUser.uid}`);
+        const snap = await getDoc(reactionRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          setUserReaction(data.emoji || '👍');
+          setIsLiked(true);
+        } else {
+          // Fallback or double-check traditional likes subcollection
+          const likeRef = doc(db, 'posts', post.id, 'likes', currentUser.uid);
+          const likeSnap = await getDoc(likeRef);
+          if (likeSnap.exists()) {
+            setUserReaction('❤️');
+            setIsLiked(true);
+          } else {
+            setUserReaction(null);
+            setIsLiked(false);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching reaction:', err);
+      }
     };
-    checkLike();
+    checkUserReaction();
   }, [post.id, currentUser]);
 
-  const handleToggleLike = async () => {
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setShowReactionsPop(true);
+  };
+
+  const handleMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setShowReactionsPop(false);
+    }, 400);
+  };
+
+  const handleTouchStart = () => {
+    const timer = setTimeout(() => {
+      setShowReactionsPop(true);
+    }, 400); // 400ms long press opens reaction bar
+    setTouchTimeout(timer);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchTimeout) {
+      clearTimeout(touchTimeout);
+      setTouchTimeout(null);
+    }
+  };
+
+  const handleReact = async (emoji: string | null) => {
     if (!currentUser) return;
-    const likeRef = doc(db, 'posts', post.id, 'likes', currentUser.uid);
+    const reactionRef = doc(db, 'reactions', `${post.id}_${currentUser.uid}`);
     const postRef = doc(db, 'posts', post.id);
+    
+    const previousReaction = userReaction;
+    
+    // Optimistic UI updates
+    if (emoji === null) {
+      setUserReaction(null);
+      setIsLiked(false);
+      setLikesCount(prev => Math.max(0, prev - 1));
+    } else {
+      setUserReaction(emoji);
+      setIsLiked(true);
+      if (!previousReaction) {
+        setLikesCount(prev => prev + 1);
+      }
+    }
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const tempSnap = await transaction.get(likeRef);
-        const postSnap = await transaction.get(postRef);
-        if (!postSnap.exists()) return;
+      if (emoji === null) {
+        // Remove reaction doc
+        await deleteDoc(reactionRef);
+        // Traditional likes subcollection also (cleanup just in case)
+        const likeRef = doc(db, 'posts', post.id, 'likes', currentUser.uid);
+        await deleteDoc(likeRef).catch(() => {});
+        
+        // Decrement like count
+        await updateDoc(postRef, {
+          likesCount: Math.max(0, (post.likesCount || 0) - 1)
+        });
+      } else {
+        // Create/Update reaction doc
+        await setDoc(reactionRef, {
+          userId: currentUser.uid,
+          postId: post.id,
+          emoji: emoji,
+          createdAt: Date.now()
+        });
 
-        const pData = postSnap.data();
-        let newCount = pData.likesCount || 0;
+        // Set traditional like (for backward compatibility and general security rules compliance)
+        const likeRef = doc(db, 'posts', post.id, 'likes', currentUser.uid);
+        await setDoc(likeRef, { userId: currentUser.uid, createdAt: Date.now() });
 
-        if (tempSnap.exists()) {
-          transaction.delete(likeRef);
-          newCount = Math.max(0, newCount - 1);
-          transaction.update(postRef, { likesCount: newCount });
-        } else {
-          transaction.set(likeRef, { userId: currentUser.uid, createdAt: Date.now() });
-          newCount += 1;
-          transaction.update(postRef, { likesCount: newCount });
+        if (!previousReaction) {
+          // Increment count
+          await updateDoc(postRef, {
+            likesCount: (post.likesCount || 0) + 1
+          });
+          
+          // Send notification
+          if (post.authorId !== currentUser.uid) {
+             await setDoc(doc(collection(db, 'users', post.authorId, 'notifications')), {
+                type: 'like',
+                fromUserId: currentUser.uid,
+                postId: post.id,
+                createdAt: Date.now(),
+                read: false
+             });
+          }
         }
-      });
-      setIsLiked(!isLiked);
-      setLikesCount((prev) => (isLiked ? Math.max(0, prev - 1) : prev + 1));
-      
-      if (!isLiked && post.authorId !== currentUser.uid) {
-         await setDoc(doc(collection(db, 'users', post.authorId, 'notifications')), {
-            type: 'like',
-            fromUserId: currentUser.uid,
-            postId: post.id,
-            createdAt: Date.now(),
-            read: false
-         });
       }
-
     } catch (e) {
-      console.error(e);
+      console.error('Failed to react:', e);
+      // Revert optimism on failure
+      setUserReaction(previousReaction);
+      setIsLiked(!!previousReaction);
     }
   };
 
@@ -145,7 +234,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
           
           <div className="flex-1">
             <Link to={`/user/${post.authorId}`} className="hover:underline">
-              <p className="font-semibold text-slate-900 dark:text-white text-sm">{author?.name || 'Loading...'}</p>
+              <p className="font-semibold text-slate-900 dark:text-white text-sm">{author?.name || t('Loading...')}</p>
             </Link>
             <p className="text-[11px] text-slate-500 font-medium">{formatRelativeTime(post.createdAt)}</p>
           </div>
@@ -171,14 +260,14 @@ export function PostCard({ post, onDelete }: PostCardProps) {
                       className="w-full text-left px-4 py-2 flex items-center gap-2 text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors text-sm font-medium"
                     >
                       <Edit2 className="w-4 h-4" />
-                      Edit
+                      {t("Edit")}
                     </button>
                     <button 
                       onClick={handleDelete}
                       className="w-full text-left px-4 py-2 flex items-center gap-2 text-rose-500 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors text-sm font-medium"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Delete
+                      {t("Delete")}
                     </button>
                   </motion.div>
                 )}
@@ -223,23 +312,75 @@ export function PostCard({ post, onDelete }: PostCardProps) {
         )}
         
         <div className="flex items-center gap-6 text-sm font-semibold text-slate-500 pt-3 border-t border-slate-100 dark:border-slate-700/50 mt-1">
-          <motion.button 
-            whileTap={{ scale: 0.8 }}
-            onClick={handleToggleLike}
-            className={`flex items-center gap-1.5 transition-colors group ${isLiked ? 'text-rose-500' : 'hover:text-rose-500'}`}
+          <div 
+            className="relative"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
           >
-            <div className="p-1.5 rounded-full group-hover:bg-rose-50 dark:group-hover:bg-rose-500/10 transition-colors">
-              <motion.div animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }} transition={{ duration: 0.3 }}>
-                <Heart className={`w-5 h-5 ${isLiked ? 'fill-rose-500' : ''}`} />
-              </motion.div>
-            </div>
-            {likesCount > 0 ? likesCount : 'Like'}
-          </motion.button>
+            {/* Reactions Selector Popover */}
+            <AnimatePresence>
+              {showReactionsPop && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: -45, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-xl rounded-full px-3 py-2 flex gap-3.5 z-40"
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  {REACTION_EMOJIS.map((item) => (
+                    <motion.button
+                      key={item.emoji}
+                      whileHover={{ scale: 1.4, y: -4 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        handleReact(item.emoji);
+                        setShowReactionsPop(false);
+                      }}
+                      className="text-2xl filter hover:drop-shadow-md transition-all duration-150 focus:outline-none"
+                      title={t(item.label)}
+                    >
+                      {item.emoji}
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Main Toggle Button */}
+            <motion.button 
+              whileTap={{ scale: 0.8 }}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onClick={() => {
+                if (isLiked) {
+                  handleReact(null);
+                } else {
+                  handleReact('👍');
+                }
+              }}
+              className={`flex items-center gap-1.5 transition-colors group ${isLiked ? 'text-[#D62828] dark:text-[#FCA5A5]' : 'hover:text-rose-500'}`}
+            >
+              <div className="p-1.5 rounded-full group-hover:bg-rose-50/50 dark:group-hover:bg-rose-500/10 transition-colors">
+                <motion.div animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }} transition={{ duration: 0.3 }}>
+                  {isLiked && userReaction ? (
+                    <span className="text-xl leading-none select-none">{userReaction}</span>
+                  ) : (
+                    <Heart className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#D62828]" />
+                  )}
+                </motion.div>
+              </div>
+              <span className="text-[13px] font-bold select-none text-slate-600 dark:text-slate-300">
+                {likesCount > 0 ? likesCount : t('Like')}
+              </span>
+            </motion.button>
+          </div>
           <button onClick={() => setShowComments(true)} className="flex items-center gap-1.5 hover:text-blue-500 transition-colors group">
             <div className="p-1.5 rounded-full group-hover:bg-blue-50 dark:group-hover:bg-blue-500/10 transition-colors">
               <MessageCircle className="w-5 h-5" />
             </div>
-            {post.commentsCount > 0 ? post.commentsCount : 'Comment'}
+            {post.commentsCount > 0 ? post.commentsCount : t('Comment')}
           </button>
         </div>
       </motion.div>

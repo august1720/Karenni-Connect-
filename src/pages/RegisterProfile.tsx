@@ -68,8 +68,14 @@ const VisibilityToggle = ({ label, value, onChange }: VisibilityToggleProps) => 
 };
 
 export default function RegisterProfile() {
-  const { currentUser, refreshProfile } = useAuth();
+  const { currentUser, userProfile, loading: authLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (!authLoading && currentUser && userProfile) {
+      navigate('/', { replace: true });
+    }
+  }, [currentUser, userProfile, authLoading, navigate]);
   const { t, language, changeLanguage } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);

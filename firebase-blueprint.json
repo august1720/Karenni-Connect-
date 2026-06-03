@@ -44,7 +44,11 @@
         "joinLink": { "type": "string" },
         "schoolId": { "type": "string" },
         "creatorId": { "type": "string" },
-        "createdAt": { "type": "number" }
+        "createdAt": { "type": "number" },
+        "type": { "type": "string" },
+        "time": { "type": "string" },
+        "category": { "type": "string" },
+        "attendees": { "type": "array" }
       },
       "required": ["title", "description", "date", "creatorId", "createdAt"]
     },
@@ -94,9 +98,57 @@
         "createdAt": { "type": "number" }
       },
       "required": ["postId", "createdAt"]
+    },
+    "MentorRequest": {
+      "title": "MentorRequest",
+      "description": "Mentorship request from student to mentor.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "mentorId": { "type": "string" },
+        "mentorName": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentPhotoURL": { "type": "string" },
+        "note": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "mentorId", "studentId", "status", "createdAt"]
+    },
+    "FlaggedItem": {
+      "title": "FlaggedItem",
+      "description": "Borderline infraction flagged for admin review.",
+      "type": "object",
+      "properties": {
+        "contentId": { "type": "string" },
+        "type": { "type": "string", "enum": ["story", "post", "comment"] },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "resolved"] }
+      },
+      "required": ["contentId", "type", "authorId", "status", "createdAt"]
+    },
+    "GlobalSetting": {
+      "title": "GlobalSetting",
+      "description": "Global application properties like content moderation rules.",
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      },
+      "required": ["enabled"]
     }
   },
   "firestore": {
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/GlobalSetting" },
+      "description": "Global application settings documents"
+    },
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User profiles"
@@ -124,6 +176,14 @@
     "/users/{userId}/savedPosts/{postId}": {
       "schema": { "$ref": "#/entities/SavedPost" },
       "description": "Posts saved by a user, mapped by postId"
+    },
+    "/mentor_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/MentorRequest" },
+      "description": "Mentorship requests mapped by requestId"
+    },
+    "/flagged_items/{itemId}": {
+      "schema": { "$ref": "#/entities/FlaggedItem" },
+      "description": "Flagged entries for admin review"
     }
   }
 }

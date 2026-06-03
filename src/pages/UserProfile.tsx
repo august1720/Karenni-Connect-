@@ -5,6 +5,8 @@ import { db } from '../lib/firebase';
 import { collection, query, where, getCountFromServer, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { motion } from 'framer-motion';
 import { User } from '../types';
+import { Share2 } from 'lucide-react';
+import { ShareMenu } from '../components/ShareMenu';
 
 const formatLastSeen = (timestamp?: number) => {
   if (!timestamp) return '';
@@ -31,6 +33,39 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
+  const fetchUser = async () => {
+    if (!id) return;
+    try {
+      const docRef = doc(db, 'users', id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setProfile(docSnap.data() as User);
+      }
+      
+      const pQuery = query(collection(db, 'posts'), where('authorId', '==', id));
+      const pSnap = await getCountFromServer(pQuery);
+      setPostsCount(pSnap.data().count);
+      
+      const followingsQuery = collection(db, 'users', id, 'following');
+      const followingsSnap = await getCountFromServer(followingsQuery);
+      setFollowingCount(followingsSnap.data().count);
+      
+      const followersQuery = collection(db, 'users', id, 'followers');
+      const followersSnap = await getCountFromServer(followersQuery);
+      setFollowersCount(followersSnap.data().count);
+      
+      if (currentUser) {
+         const myFollowSnap = await getDoc(doc(db, 'users', id, 'followers', currentUser.uid));
+         setIsFollowing(myFollowSnap.exists());
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (id === currentUser?.uid) {
@@ -38,38 +73,15 @@ export default function UserProfile() {
       return;
     }
 
-    const fetchUser = async () => {
-      if (!id) return;
-      try {
-        const docRef = doc(db, 'users', id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setProfile(docSnap.data() as User);
-        }
-        
-        const pQuery = query(collection(db, 'posts'), where('authorId', '==', id));
-        const pSnap = await getCountFromServer(pQuery);
-        setPostsCount(pSnap.data().count);
-        
-        const followingsQuery = collection(db, 'users', id, 'following');
-        const followingsSnap = await getCountFromServer(followingsQuery);
-        setFollowingCount(followingsSnap.data().count);
-        
-        const followersQuery = collection(db, 'users', id, 'followers');
-        const followersSnap = await getCountFromServer(followersQuery);
-        setFollowersCount(followersSnap.data().count);
-        
-        if (currentUser) {
-           const myFollowSnap = await getDoc(doc(db, 'users', id, 'followers', currentUser.uid));
-           setIsFollowing(myFollowSnap.exists());
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchUser();
+
+    const handleRefresh = () => {
+      fetchUser();
+    };
+    window.addEventListener('app-refresh', handleRefresh);
+    return () => {
+      window.removeEventListener('app-refresh', handleRefresh);
+    };
   }, [id, currentUser, navigate]);
 
   const toggleFollow = async () => {
@@ -175,19 +187,28 @@ export default function UserProfile() {
                 )}
               </div>
               
-              {currentUser && currentUser.uid !== id && (
+              <div className="flex gap-2.5 justify-center items-center mt-2 flex-wrap">
+                {currentUser && currentUser.uid !== id && (
+                  <button
+                    onClick={toggleFollow}
+                    disabled={isFollowLoading}
+                    className={`px-6 py-2 rounded-full font-bold text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 w-32 ${
+                      isFollowing 
+                        ? 'bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 focus:ring-slate-200' 
+                        : 'bg-gradient-to-r from-[#D62828] to-[#1E3A8A] text-white hover:opacity-90 focus:ring-[#D62828]'
+                    }`}
+                  >
+                    {isFollowLoading ? '...' : isFollowing ? 'Following' : 'Follow'}
+                  </button>
+                )}
                 <button
-                  onClick={toggleFollow}
-                  disabled={isFollowLoading}
-                  className={`px-6 py-2 rounded-full font-bold text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 w-32 ${
-                    isFollowing 
-                      ? 'bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 focus:ring-slate-200' 
-                      : 'bg-gradient-to-r from-[#D62828] to-[#1E3A8A] text-white hover:opacity-90 focus:ring-[#D62828]'
-                  }`}
+                  onClick={() => setIsShareOpen(true)}
+                  className="px-5 py-2 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm shadow-sm hover:bg-slate-200 dark:hover:bg-slate-650 transition-all flex items-center gap-1.5"
                 >
-                  {isFollowLoading ? '...' : isFollowing ? 'Following' : 'Follow'}
+                  <Share2 className="w-4 h-4 text-[#D62828]" />
+                  Share Profile
                 </button>
-              )}
+              </div>
             </div>
             <div className="flex gap-6 mt-4 pb-2 border-b border-slate-100 dark:border-slate-700/50 w-full justify-center">
               <div className="text-center">
@@ -228,6 +249,15 @@ export default function UserProfile() {
                 </div>
               </div>
             )}
+            {profile.gender && (
+              <div className="flex gap-3 text-sm">
+                <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">👤</div>
+                <div className="pt-1">
+                  <p className="font-semibold text-slate-900 dark:text-slate-100">Gender</p>
+                  <p className="text-slate-500">{profile.gender}</p>
+                </div>
+              </div>
+            )}
             {(!profile.visibility?.ethnicity || profile.visibility.ethnicity === 'public') && (profile.majorEthnicity || profile.customEthnicity) && (
               <div className="flex gap-3 text-sm">
                 <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-600">🌍</div>
@@ -255,8 +285,8 @@ export default function UserProfile() {
               <div className="pt-4 border-t border-slate-100 dark:border-slate-700/50">
                 <strong className="text-slate-900 dark:text-slate-100 text-sm block mb-3 font-semibold text-center uppercase tracking-wider text-[10px]">Interests & Skills</strong>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {profile.interests?.map(i => (
-                    <span key={i} className="px-4 py-1.5 bg-slate-100 dark:bg-[#D62828]/10 text-slate-700 dark:text-[#FCA5A5] border border-slate-200 dark:border-[#D62828]/20 text-xs font-semibold rounded-full shadow-sm">{i}</span>
+                  {profile.interests?.map((i, idx) => (
+                    <span key={`${i}-${idx}`} className="px-4 py-1.5 bg-slate-100 dark:bg-[#D62828]/10 text-slate-700 dark:text-[#FCA5A5] border border-slate-200 dark:border-[#D62828]/20 text-xs font-semibold rounded-full shadow-sm">{i}</span>
                   )) || <span className="text-slate-500 ml-1">None</span>}
                 </div>
               </div>
@@ -264,6 +294,14 @@ export default function UserProfile() {
           </div>
         </div>
       </motion.div>
+
+      <ShareMenu
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        title={profile.name}
+        shareUrl={`${window.location.origin}/user/${profile.id}`}
+        defaultText={`Check out this student profile on StudySpace: @${profile.username} (${profile.name})`}
+      />
     </div>
   );
 }

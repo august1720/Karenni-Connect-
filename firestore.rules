@@ -49,10 +49,8 @@ service cloud.firestore {
     match /reactions/{reactionId} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn()
-        && request.auth.uid == incoming().userId
-        && incoming().keys().hasAll(['userId', 'postId', 'emoji', 'createdAt'])
         && incoming().userId == request.auth.uid;
-      allow delete: if isSignedIn() && request.auth.uid == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 
     match /users/{userId} {
@@ -75,23 +73,42 @@ service cloud.firestore {
       return data.keys().hasAny(['name', 'ownerId', 'createdAt'])
         && data.name is string && data.name.size() > 0 && data.name.size() <= 150
         && (data.get('description', '') is string && data.get('description', '').size() <= 1000)
+        && (data.get('guidelines', '') is string && data.get('guidelines', '').size() <= 2000)
         && (data.get('clubs', []) is list && data.get('clubs', []).size() <= 50)
         && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 1048487)
         && (data.get('studentCount', 0) is number)
-        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.ownerId is string
         && data.createdAt is number;
     }
 
     match /schools/{schoolId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() 
-        && isValidSchool(incoming());
+        && isValidSchool(incoming())
+        && incoming().ownerId == request.auth.uid;
       
       allow update: if isSignedIn()
-        && existing().ownerId == request.auth.uid
-        && isValidSchool(incoming())
-        && incoming().ownerId == existing().ownerId
-        && incoming().createdAt == existing().createdAt;
+        && (
+          // Owner edit: can update all valid school fields keeping ownerId/createdAt immutable
+          (isValidSchool(incoming()) && incoming().ownerId == existing().ownerId && incoming().createdAt == existing().createdAt && request.auth.uid == existing().ownerId)
+          ||
+          // Participant joining/leaving: can update ONLY studentCount
+          (incoming().diff(existing()).affectedKeys().hasOnly(['studentCount']) && incoming().studentCount is number)
+        );
+
+      allow delete: if isSignedIn()
+        && existing().ownerId == request.auth.uid;
+
+      match /members/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.auth.uid == userId;
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /events/{eventId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
     }
 
     function isValidEvent(data) {
@@ -101,6 +118,10 @@ service cloud.firestore {
         && data.date is number 
         && (data.get('joinLink', '') is string && data.get('joinLink', '').size() <= 500)
         && (data.get('schoolId', '') is string && data.get('schoolId', '').size() <= 128)
+        && (data.get('type', '') is string && data.get('type', '').size() <= 200)
+        && (data.get('time', '') is string && data.get('time', '').size() <= 150)
+        && (data.get('category', '') is string && data.get('category', '').size() <= 100)
+        && (data.get('attendees', []) is list && data.get('attendees', []).size() <= 1000)
         && data.creatorId is string && data.creatorId == request.auth.uid
         && data.createdAt is number;
     }
@@ -109,6 +130,15 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn() 
         && isValidEvent(incoming());
+      allow update: if isSignedIn()
+        && (
+          // Creator edit
+          (request.auth.uid == existing().creatorId && isValidEvent(incoming()) && incoming().creatorId == existing().creatorId && incoming().createdAt == existing().createdAt)
+          ||
+          // User RSVP action
+          (incoming().diff(existing()).affectedKeys().hasOnly(['attendees']) && incoming().attendees is list && incoming().attendees.size() <= 1000)
+        );
+      allow delete: if isSignedIn() && existing().creatorId == request.auth.uid;
     }
 
     function isValidPost(data) {
@@ -144,16 +174,28 @@ service cloud.firestore {
         allow create: if isSignedIn()
           && incoming().keys().hasAny(['authorId', 'content', 'createdAt'])
           && incoming().authorId == request.auth.uid
-          && incoming().content is string && incoming().content.size() > 0 && incoming().content.size() <= 500;
+          && incoming().content is string && incoming().content.size() <= 500
+          && (incoming().get('audioURL', '') is string && incoming().get('audioURL', '').size() <= 1048487);
+        allow update: if isSignedIn()
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['reactions'])
+            || incoming().diff(existing()).affectedKeys().size() == 0
+          );
         allow delete: if isSignedIn() && existing().authorId == request.auth.uid;
+
+        match /replies/{replyId} {
+          allow read: if isSignedIn();
+          allow create: if isSignedIn()
+            && incoming().keys().hasAny(['authorId', 'content', 'createdAt'])
+            && incoming().authorId == request.auth.uid
+            && incoming().content is string && incoming().content.size() > 0 && incoming().content.size() <= 500;
+          allow delete: if isSignedIn() && existing().authorId == request.auth.uid;
+        }
       }
       
       match /likes/{userId} {
         allow read: if isSignedIn();
-        allow create: if isSignedIn()
-          && request.auth.uid == userId
-          && incoming().keys().hasAny(['userId', 'createdAt'])
-          && incoming().userId == request.auth.uid;
+        allow create, update: if isSignedIn() && request.auth.uid == userId;
         allow delete: if isSignedIn() && request.auth.uid == userId;
       }
     }
@@ -218,6 +260,67 @@ service cloud.firestore {
 
     match /calls_history/{id} {
       allow read, write: if isSignedIn();
+    }
+
+    function isValidMentorRequest(data) {
+      return data.keys().hasAll(['id', 'mentorId', 'studentId', 'status', 'createdAt'])
+        && data.id is string && isValidId(data.id)
+        && data.mentorId is string && isValidId(data.mentorId)
+        && data.studentId is string && data.studentId == request.auth.uid
+        && data.status is string && data.status in ['pending', 'accepted', 'declined']
+        && data.createdAt is number
+        && (data.get('note', '') is string && data.get('note', '').size() <= 1000)
+        && (data.get('mentorName', '') is string && data.get('mentorName', '').size() <= 150)
+        && (data.get('studentName', '') is string && data.get('studentName', '').size() <= 150)
+        && (data.get('studentPhotoURL', '') is string && data.get('studentPhotoURL', '').size() <= 1048487);
+    }
+
+    match /mentor_requests/{requestId} {
+      allow read: if isSignedIn() 
+        && (resource.data.mentorId == request.auth.uid || resource.data.studentId == request.auth.uid);
+      allow create: if isSignedIn()
+        && isValidMentorRequest(incoming());
+      allow update: if isSignedIn()
+        && existing().mentorId == request.auth.uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+        && incoming().status in ['accepted', 'declined'];
+      allow delete: if isSignedIn()
+        && (existing().mentorId == request.auth.uid || existing().studentId == request.auth.uid);
+    }
+
+    function isValidFlaggedItem(data) {
+      return data.keys().hasAll(['contentId', 'type', 'authorId', 'createdAt', 'status'])
+        && data.contentId is string && isValidId(data.contentId)
+        && data.type is string && data.type in ['story', 'post', 'comment']
+        && data.authorId is string && isValidId(data.authorId)
+        && data.createdAt is number
+        && data.status is string && data.status in ['pending', 'resolved']
+        && (data.get('authorName', '') is string && data.get('authorName', '').size() <= 150)
+        && (data.get('content', '') is string && data.get('content', '').size() <= 2000)
+        && (data.get('imageUrl', '') is string && data.get('imageUrl', '').size() <= 1048487)
+        && (data.get('category', '') is string && data.get('category', '').size() <= 150)
+        && (data.get('reason', '') is string && data.get('reason', '').size() <= 1000);
+    }
+
+    match /flagged_items/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(itemId)
+        && isValidFlaggedItem(incoming());
+      allow update: if isSignedIn() && isValidId(itemId)
+        && isValidFlaggedItem(incoming());
+      allow delete: if isSignedIn() && isValidId(itemId);
+    }
+
+    function isValidSetting(data) {
+      return data.keys().hasAll(['enabled'])
+        && data.keys().size() == 1
+        && data.enabled is bool;
+    }
+
+    match /settings/{settingId} {
+      allow read: if isSignedIn() && isValidId(settingId);
+      allow create, update: if isSignedIn() && isValidId(settingId)
+        && isValidSetting(incoming());
     }
   }
 }

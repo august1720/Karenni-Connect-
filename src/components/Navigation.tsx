@@ -1,23 +1,21 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Compass, MessageCircle, Calendar, User, Globe } from 'lucide-react';
+import { Home, Compass, MessageCircle, Calendar, User, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../context/LanguageContext';
+import { triggerHaptic } from '../lib/haptic';
 
 export default function Navigation() {
-  const { t, language, changeLanguage } = useLanguage();
+  const { t } = useLanguage();
 
   const navItems = [
     { to: "/", icon: Home, label: t("Home") },
     { to: "/discover", icon: Compass, label: t("Discover") },
+    { to: "/ai-study", icon: Sparkles, label: t("AI Study") },
     { to: "/messages", icon: MessageCircle, label: t("Messages") },
     { to: "/events", icon: Calendar, label: t("Events") },
     { to: "/profile", icon: User, label: t("Profile") },
   ];
-
-  const handleLanguageToggle = () => {
-    changeLanguage(language === 'en' ? 'my' : 'en');
-  };
 
   return (
     <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-1rem)] max-w-sm bg-white/95 dark:bg-[#1E293B]/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700/50 rounded-[2rem] z-50 shadow-xl shadow-slate-300/40 dark:shadow-none">
@@ -26,6 +24,7 @@ export default function Navigation() {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={() => triggerHaptic(10)}
             className={({ isActive }) =>
               cn(
                 "relative w-[3.25rem] h-[3.25rem] rounded-full flex flex-col items-center justify-center transition-all duration-300",
@@ -50,18 +49,6 @@ export default function Navigation() {
             )}
           </NavLink>
         ))}
-
-        <button
-          onClick={handleLanguageToggle}
-          className="relative w-[3.25rem] h-[3.25rem] rounded-full flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-all duration-300 focus:outline-none"
-          title={language === 'en' ? "Switch to Burmese" : "အင်္ဂလိပ်ဘာသာသို့ ပြောင်းရန်"}
-        >
-          <Globe className="w-6 h-6 stroke-[1.5]" />
-          <span className="absolute top-1.5 right-1.5 bg-[#D62828] text-[7.5px] text-white px-1 py-0.5 rounded font-extrabold leading-none uppercase tracking-wider">
-            {language}
-          </span>
-          <span className="sr-only">Toggle Language</span>
-        </button>
       </div>
     </nav>
   );

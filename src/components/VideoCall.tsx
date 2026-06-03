@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { collection, doc, addDoc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { PhoneOff, Mic, MicOff, Video as VidIcon, VideoOff, Maximize, Minimize, MonitorUp } from 'lucide-react';
 import { User } from '../types';
 
@@ -87,6 +87,8 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
         const answerDescription = new RTCSessionDescription(data.answer);
         pc.setRemoteDescription(answerDescription);
       }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, `calls/${roomId}`);
     });
 
     onSnapshot(answerCandidates, (snapshot) => {
@@ -96,6 +98,8 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
           pc.addIceCandidate(candidate);
         }
       });
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, `calls/${roomId}/answerCandidates`);
     });
   };
 
@@ -132,6 +136,8 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
           pc.addIceCandidate(new RTCIceCandidate(data));
         }
       });
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, `calls/${roomId}/offerCandidates`);
     });
   };
 

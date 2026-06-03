@@ -117,10 +117,12 @@ export default function Home() {
   const [myMemberships, setMyMemberships] = useState<Record<string, boolean>>({});
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const fetchPosts = async () => {
     try {
       setLoading(true);
+      setConnectionError(null);
       const postsQuery = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20));
       const snapshot = await getDocs(postsQuery);
       const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
@@ -146,8 +148,9 @@ export default function Home() {
       const storiesQuery = query(collection(db, 'stories'), orderBy('createdAt', 'desc'), limit(15));
       const storiesSnapshot = await getDocs(storiesQuery);
       setStories(storiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (err) {
-      handleFirestoreError(err, OperationType.GET, 'posts');
+    } catch (err: any) {
+      console.error("Firestore Loading issues captured gracefully:", err);
+      setConnectionError(err?.message || String(err));
     } finally {
       setLoading(false);
     }
@@ -161,7 +164,7 @@ export default function Home() {
       const unread = snap.docs.filter(d => !d.data().read);
       setUnreadCount(unread.length);
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, `users/${currentUser.uid}/notifications`);
+      console.error("Notifications real-time snapshot warning:", err);
     });
     return () => unsubscribe();
   }, [currentUser]);
@@ -571,6 +574,37 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-6 relative">
+      
+      {/* Connection Error / Offline Helpful Alert */}
+      {connectionError && (
+        <div className="mx-2 p-4 bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-500/30 rounded-2xl text-slate-800 dark:text-slate-200 shadow-sm space-y-3 animate-fade-in">
+          <div className="flex items-center gap-2.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-sm font-extrabold text-amber-700 dark:text-amber-400">
+              Firebase Firestore အော့ဖ်လိုင်း/မချိတ်ဆက်နိုင်ပါ
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+            အောက်ပါ အဆင့် ၃ ဆင့်ကို လုပ်ဆောင်ပေးရန် လိုအပ်ပါသည် -
+          </p>
+          <ol className="text-[11px] list-decimal pl-4.5 space-y-1.5 text-slate-600 dark:text-slate-300 font-medium">
+            <li>
+              <strong>Firestore database ဆောက်ရန်</strong>: Firebase Console သို့သွားပြီး Left menu ရှိ <strong className="text-amber-600">Firestore Database</strong> ကိုနှိပ်ပါ။ <strong className="text-amber-600">Create database</strong> ကိုနှိပ်၍ select လုပ်ပြီး ဖွင့်ရပါမည်။
+            </li>
+            <li>
+              <strong>GCP API Key restriction စစ်ရန်</strong>: Google Cloud Console Credentials တွင် <strong className="text-amber-600">Browser key (auto created by Firebase)</strong> ကိုနှိပ်ပြီး "Cloud Firestore API" ကို restrict မလုပ်ထားဘဲ enable လုပ်ရန် လိုအပ်ပါသည်။
+            </li>
+            <li>
+              <strong>Authorized Domains (Domain ခွင့်ပြုချက်)</strong>: Firebase Authentication settings &gt; <strong className="text-amber-600">Authorized Domains</strong> တွင် ယခု preview app link domain ကို list ထဲသို့ ထည့်သွင်းပေးရပါမည်။
+            </li>
+          </ol>
+          <div className="pt-1 select-all">
+            <code className="text-[10px] font-mono block p-2 bg-slate-100 dark:bg-slate-900 rounded-lg text-slate-500 overflow-x-auto max-h-16">
+              Error details: {connectionError}
+            </code>
+          </div>
+        </div>
+      )}
       
       {/* Dynamic Header */}
       <header className="px-2 pt-4 flex justify-between items-center">

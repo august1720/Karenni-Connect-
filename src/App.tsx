@@ -14,6 +14,7 @@ import Events from './pages/Events';
 import Profile from './pages/Profile';
 import Messages from './pages/Messages';
 import Navigation from './components/Navigation';
+import { LoadingScreen } from './components/LoadingScreen';
 
 import UserProfile from './pages/UserProfile';
 import Settings from './pages/Settings';
@@ -21,6 +22,11 @@ import AIStudy from './pages/AIStudy';
 import { LanguageProvider } from './context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { triggerHaptic } from './lib/haptic';
+
+// Standardized pull-to-refresh configuration for snappier and consistent gesture response
+const PULL_THRESHOLD = 60;          // Required pull distance in pixels to trigger refresh
+const REFRESH_HOLD_POSITION = 45;   // Active indicator position during refresh loading
+const REFRESH_DURATION = 1200;      // Streamlined active anim duration (1.2s) for better responsiveness
 
 function ProtectedRoute() {
   const { currentUser, userProfile, loading } = useAuth();
@@ -61,21 +67,21 @@ function ProtectedRoute() {
   const handleTouchEnd = () => {
     if (isRefreshing) return;
     isPullActive.current = false;
-    if (pullDistance >= 60) {
+    if (pullDistance >= PULL_THRESHOLD) {
       // Trigger refresh!
       setIsRefreshing(true);
-      setPullDistance(45); // Hold at active position
+      setPullDistance(REFRESH_HOLD_POSITION); // Hold at active position
       triggerHaptic(20); // Nice firm feedback
       
       // Emit the refresh event
       const refreshEvent = new CustomEvent('app-refresh');
       window.dispatchEvent(refreshEvent);
 
-      // Auto clear after 1.5s
+      // Auto clear after the standardized duration
       setTimeout(() => {
         setIsRefreshing(false);
         setPullDistance(0);
-      }, 1500);
+      }, REFRESH_DURATION);
     } else {
       setPullDistance(0);
     }
@@ -132,7 +138,7 @@ function ProtectedRoute() {
     return () => clearTimeout(timeout);
   }, [location.pathname]);
 
-  if (loading) return <div className="h-screen w-full flex items-center justify-center bg-[#F5F7FB]/50 dark:bg-[#0F172A]/50 backdrop-blur-md"><div className="w-8 h-8 rounded-full border-4 border-indigo-600 dark:border-indigo-400 border-t-transparent animate-spin"></div></div>;
+  if (loading) return <LoadingScreen />;
   if (!currentUser) return <Navigate to="/login" replace />;
   // If the user hasn't created a profile yet, force them to do so before accessing the app
   if (!userProfile) return <Navigate to="/register-profile" replace />;
@@ -158,79 +164,81 @@ function ProtectedRoute() {
       <AnimatePresence>
         {(pullDistance > 0 || isRefreshing) && (
           <motion.div
-            initial={{ opacity: 0, y: -50, scale: 0.8 }}
+            initial={{ opacity: 0, y: -60, scale: 0.6, x: "-50%" }}
             animate={{ 
               opacity: 1, 
               y: pullDistance - 20, 
-              scale: isRefreshing ? 1.05 : Math.min(1, pullDistance / 45) 
+              scale: isRefreshing ? 1.1 : Math.min(1.1, pullDistance / REFRESH_HOLD_POSITION) 
             }}
-            exit={{ opacity: 0, y: -50, scale: 0.8, transition: { duration: 0.25 } }}
-            className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center justify-center pt-2 select-none pointer-events-none"
-            style={{ top: '15px' }}
+            transition={{
+              type: "spring",
+              stiffness: 600,
+              damping: 28,
+              mass: 0.3,
+              ease: [0.22, 1, 0.36, 1]
+            }}
+            exit={{ 
+              opacity: 0, 
+              y: -60, 
+              scale: 0.6, 
+              transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] } 
+            }}
+            className="absolute left-1/2 z-50 flex items-center justify-center pt-2 select-none pointer-events-none"
+            style={{ top: '15px', x: '-50%', willChange: 'transform, opacity' }}
           >
-            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-2.5 rounded-full shadow-lg border border-slate-200/50 dark:border-slate-800/80 flex items-center justify-center">
+            <div className="bg-white dark:bg-slate-900/95 backdrop-blur-md p-3 rounded-full shadow-lg border border-slate-100 dark:border-slate-800/80 flex items-center justify-center">
               
-              {/* Magical Double-Orb Rotating Circles */}
-              <div className="relative w-6 h-6 flex items-center justify-center">
+              {/* Concentric red, white, blue rings matching loading screen aesthetic */}
+              <div className="relative w-8 h-8 flex items-center justify-center">
                 {isRefreshing ? (
                   <>
-                    {/* Pulsing ring */}
+                    {/* Ring 1 - Outermost Red */}
                     <motion.div 
-                      className="absolute inset-0 rounded-full border border-[#D62828]/25 dark:border-red-500/25"
-                      animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0.1, 0.6] }}
-                      transition={{ scale: { repeat: Infinity, duration: 1.5, ease: "easeInOut" }, opacity: { repeat: Infinity, duration: 1.5, ease: "easeInOut" } }}
-                    />
-                    {/* Rotating segmented arc */}
-                    <motion.svg 
-                      className="absolute inset-0 w-full h-full text-[#1E3A8A] dark:text-blue-500" 
-                      viewBox="0 0 24 24"
+                      className="absolute inset-0 rounded-full border-2 border-red-500 border-t-transparent border-b-transparent"
+                      style={{ willChange: 'transform' }}
                       animate={{ rotate: 360 }}
-                      transition={{ rotate: { repeat: Infinity, duration: 0.8, ease: "linear" } }}
-                    >
-                      <circle 
-                        className="opacity-25" 
-                        cx="12" cy="12" r="10" 
-                        stroke="currentColor" strokeWidth="3" fill="none" 
-                      />
-                      <path 
-                        className="opacity-100" 
-                        fill="currentColor" 
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" 
-                      />
-                    </motion.svg>
-                    {/* Glowing magic inner orb */}
+                      transition={{ repeat: Infinity, duration: 1.0, ease: "linear" }}
+                    />
+                    {/* Ring 2 - Middle White/Slate */}
                     <motion.div 
-                      className="w-2.5 h-2.5 rounded-full bg-[#D62828] dark:bg-red-500 shadow-sm"
-                      animate={{ scale: [0.8, 1.2, 0.8] }}
-                      transition={{ scale: { repeat: Infinity, duration: 1.2, ease: "easeInOut" } }}
+                      className="absolute w-6 h-6 rounded-full border-2 border-slate-300 dark:border-white border-l-transparent border-r-transparent"
+                      style={{ willChange: 'transform' }}
+                      animate={{ rotate: -360 }}
+                      transition={{ repeat: Infinity, duration: 1.3, ease: "linear" }}
+                    />
+                    {/* Ring 3 - Innermost Blue */}
+                    <motion.div 
+                      className="absolute w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent border-b-transparent"
+                      style={{ willChange: 'transform' }}
+                      animate={{ rotate: 360 }}
+                      transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+                    />
+                    {/* Golden star/dot core */}
+                    <motion.div 
+                      className="absolute w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
+                      style={{ willChange: 'transform' }}
+                      animate={{ scale: [0.8, 1.3, 0.8] }}
+                      transition={{ repeat: Infinity, duration: 1.0, ease: "easeInOut" }}
                     />
                   </>
                 ) : (
                   <>
-                    {/* Rotation matching pull distance */}
-                    <motion.svg 
-                      className="w-full h-full text-slate-400 dark:text-slate-500" 
-                      viewBox="0 0 24 24"
-                      style={{ rotate: pullDistance * 4 }}
-                    >
-                      <circle 
-                        className="opacity-25" 
-                        cx="12" cy="12" r="10" 
-                        stroke="currentColor" strokeWidth="2.5" fill="none" 
-                      />
-                      <circle 
-                        cx="12" cy="12" r="10" 
-                        stroke="currentColor" strokeWidth="2.5" fill="none" 
-                        strokeDasharray="63"
-                        strokeDashoffset={63 - (63 * Math.min(100, (pullDistance / 60) * 100)) / 100}
-                        strokeLinecap="round"
-                        className="text-[#D62828] dark:text-red-400"
-                      />
-                    </motion.svg>
-                    {/* Floating static center core */}
+                    {/* Pulling phase concentric arcs */}
+                    <motion.div 
+                      className="absolute inset-0 rounded-full border-2 border-red-500 border-t-transparent border-b-transparent"
+                      style={{ rotate: pullDistance * 4.5, willChange: 'transform' }}
+                    />
+                    <motion.div 
+                      className="absolute w-6 h-6 rounded-full border-2 border-slate-300 dark:border-white/80 border-l-transparent border-r-transparent"
+                      style={{ rotate: -pullDistance * 3.5, willChange: 'transform' }}
+                    />
+                    <motion.div 
+                      className="absolute w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent border-b-transparent"
+                      style={{ rotate: pullDistance * 5.5, willChange: 'transform' }}
+                    />
                     <div 
-                      className="absolute w-2 h-2 rounded-full bg-[#1E3A8A] dark:bg-blue-400 transition-transform"
-                      style={{ transform: `scale(${Math.min(1, pullDistance / 40)})` }}
+                      className="absolute w-1.5 h-1.5 rounded-full bg-amber-400 transition-transform"
+                      style={{ transform: `scale(${Math.min(1.1, pullDistance / (REFRESH_HOLD_POSITION * 0.9))})`, willChange: 'transform' }}
                     />
                   </>
                 )}

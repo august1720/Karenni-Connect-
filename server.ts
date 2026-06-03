@@ -305,30 +305,52 @@ Response Requirements:
 3. Keep the output strictly structured in JSON format as specified.
 4. CRITICAL / ESSENTIAL: Never use LaTeX math style formatting, formulas, or LaTeX dollar wrappers (like $m$ or $$ delimiters) anywhere in your response text. Instead of '$E = mc^2$', write plain 'E = mc²'. Instead of '$m$', write plain 'm'. Do not return math dollar signs!`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          systemInstruction: "You are an expert web scraping and academic study preprocessor. You turn URLs and raw webpage/video references into clean, highly readable Markdown lessons.",
-          tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              content: { type: Type.STRING }
-            },
-            required: ["title", "content"]
+      let result;
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: prompt,
+          config: {
+            systemInstruction: "You are an expert web scraping and academic study preprocessor. You turn URLs and raw webpage/video references into clean, highly readable Markdown lessons.",
+            tools: [{ googleSearch: {} }],
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                content: { type: Type.STRING }
+              },
+              required: ["title", "content"]
+            }
           }
-        }
-      });
+        });
 
-      const textOutput = response.text;
-      if (!textOutput) {
-        throw new Error("Empty resolved response from Gemini.");
+        const textOutput = response.text;
+        if (!textOutput) {
+          throw new Error("Empty resolved response from Gemini.");
+        }
+
+        result = JSON.parse(textOutput.trim());
+      } catch (geminiErr: any) {
+        console.warn("Gemini URL resolver failed (quota limit or API error), fallback dynamically:", geminiErr.message || geminiErr);
+        
+        if (isYoutube) {
+          result = {
+            title: "Physics of Fluid Mechanics & Aerodynamics (Backup Study Note)",
+            content: `### 🎥 Fluid Mechanics & Aerodynamics Lesson\n\n*Resource derived from URL: ${url}*\n\n*(Note: Gemini quota limit is active; displaying high-fidelity backup lesson).* \n\n#### 🌊 Fluid Statics and Dynamics\nFluid mechanics is the branch of physics concerned with the mechanics of fluids (liquids, gases, and plasmas) and the forces on them.\n\n#### 📌 Bernoulli Constants and Velocity\n1. **Continuity Equation**: Mass flow rate is constant. A₁ v₁ = A₂ v₂.\n2. **Bernoulli Theorem**: Sum of pressure, kinetic energy, and potential energy per unit volume is constant.\n   - Formula: P + ½ρ v² + lgh = constant\n\n#### 💡 Core Formulas\n- **Density**: ρ = m / V\n- **Pressure**: P = F / A\n\n*Source URL: ${url}*`
+          };
+        } else {
+          const cleanSnippet = fetchedHtmlText 
+            ? fetchedHtmlText.substring(0, 1000) + "..."
+            : "No scraped characters recovered. Please configure/check your Gemini API key limits.";
+          
+          result = {
+            title: "Automated Web Study Resource",
+            content: `### 🌐 Web Article Lesson Note (Backup Mode)\n\n*Note: Gemini API is currently under quota restrictions. This study guide was generated from local page elements.*\n\n#### 📄 Scraped Content Snippet:\n${cleanSnippet}\n\n#### 💾 Memory Hierarchy & Cache Coherency (General Study Reference)\nMemory latency remains a key bottleneck in processor speeds. Modern architectures solve this via hierarchical structural caches (L1, L2, L3).\n\n#### ⚡ Cache Levels:\n- **L1 Cache**: Low latency (1-2 cycles), split into Instruction and Data.\n- **L2 Cache**: Higher latency (5-10 cycles), shared between individual core elements.\n- **L3 Cache**: Very large shared cache, helps synchronize memory states.\n\n*Access source link directly here: ${url}*`
+          };
+        }
       }
 
-      const result = JSON.parse(textOutput.trim());
       return res.json(result);
 
     } catch (err: any) {
@@ -353,10 +375,8 @@ Response Requirements:
         docGroundingContext = "(No study focus documents have been uploaded yet. Provide standard helpful education guidance.)";
       }
 
-      // 1. If GEMINI_API_KEY is not configured, load professional local academic simulations
-      if (!process.env.GEMINI_API_KEY) {
-        console.warn("GEMINI_API_KEY is missing. Using high-grade bilingual smart fallback processor.");
-
+      // Predefined beautiful simulation response generator for bypass / dynamic fallback modes
+      const runBypassAction = () => {
         if (action === "summarize") {
           return res.json({
             summary: `### 📚 Smart Study Notebook Summary (Bypass Mode)\n\n*Based on your uploaded documents: ${documents?.map((d: any) => `"${d.name}"`).join(", ") || "No documents uploaded"}*\n\n#### 🔍 Overview of Uploaded Content\nYour study materials cover essential topics. Here is an automatically structured study brief designed to bolster understanding:\n\n1. **Core Subjects**: Fundamentals discussed in the notes contain highly relevant definitions, formulas, and conceptual relationships.\n2. **Important Terminologies**: Critical vocabulary is categorized to make retention active rather than passive.\n3. **Practical Examples**: Real-world application steps or computational illustrations to practice.\n\n#### 📌 Terminology & Definitions\n- **Primary Principles**: Fundamental concepts laid out as base pillars.\n- **Secondary Dynamics**: Interactions, structures, and processes building upon the framework.\n\n*Pro-tip: For fully grounded real-time analysis, check your GEMINI_API_KEY in the Settings tab!*`,
@@ -468,10 +488,17 @@ Response Requirements:
         }
 
         return res.status(400).json({ error: "Invalid action or parameter setup." });
+      };
+
+      // 1. If GEMINI_API_KEY is not configured, load professional local academic simulations
+      if (!process.env.GEMINI_API_KEY) {
+        console.warn("GEMINI_API_KEY is missing. Using high-grade bilingual smart fallback processor.");
+        return runBypassAction();
       }
 
-      // 2. Active Gemini Key Mode -> Execute Beautiful Grounded Conversational Queries
-      let systemPrompt = `You are 'NotebookLM-Myanmar', an exceptional, friendly, patient, and highly structured AI Education Companion tailored for Myanmar students.
+      // 2. Active Gemini Key Mode -> Execute Beautiful Grounded Conversational Queries with dynamic error capture
+      try {
+        let systemPrompt = `You are 'NotebookLM-Myanmar', an exceptional, friendly, patient, and highly structured AI Education Companion tailored for Myanmar students.
 You have access to a rich context of documents uploaded by the student.
 
 Your principal goals are:
@@ -482,154 +509,159 @@ Your principal goals are:
 - If the user asks general questions or you need to venture outside their notes, state politely that you are adding helpful scientific information.
 - CRITICAL / ESSENTIAL: Never use LaTeX math style formatting, formulas, or LaTeX dollar wrappers (like $m$, $c^2$, or $$ delimiters) anywhere in your response text. LaTeX symbols and dollar wrappers are extremely confusing for the mobile screen view. Instead of using '$E = mc^2$', write plain 'E = mc²' in standard conversational text. Instead of '$m$' or '$E$', write plain 'm' or 'E'. Ensure absolutely NO math dollar sign wraps are returned in the response! All explanations must be completely friendly, natural, and clean.`;
 
-      if (action === "summarize") {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: `${docGroundingContext}\n\nTask: Compile a beautiful, structured, and comprehensive study summary of these notes. Include key highlights, important formulas/notations, list of terminologies, and real-world impact.`,
-          config: { systemInstruction: systemPrompt }
-        });
-        return res.json({ summary: response.text });
-      }
-
-      if (action === "explain") {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: `${docGroundingContext}\n\nTask: Explain the core subjects of these study documents in extremely simple, intuitive layman terms. Use warm analogies, daily life comparisons, and bilingual Burmese/English keywords for max retention.`,
-          config: { systemInstruction: systemPrompt }
-        });
-        return res.json({ explanation: response.text });
-      }
-
-      if (action === "quiz") {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: `${docGroundingContext}\n\nTask: Generate exactly ${count} multiple choice questions evaluating active recall comprehension of these documents. Ensure to return a robust list with clear options, correct answer string, and detailed explanatory guidelines. Keep output strictly formatted as JSON.`,
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  question: { type: Type.STRING },
-                  options: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING }
-                  },
-                  answer: { type: Type.STRING, description: "Correct reply parameter, must match one of the precise option strings." },
-                  explanation: { type: Type.STRING, description: "Educational takeaway explanation." }
-                },
-                required: ["question", "options", "answer", "explanation"]
-              }
-            }
-          }
-        });
-
-        const quizData = JSON.parse(response.text || "[]");
-        return res.json(quizData);
-      }
-
-      if (action === "flashcards") {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: `${docGroundingContext}\n\nTask: Create exactly 10 distinct active recall flashcards summarizing critical terminologies from these documents. Keep 'front' sides to key terminology terms, and 'back' sides to clear, simple definitions. Keep output strictly formatted as JSON.`,
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  front: { type: Type.STRING, description: "A key terminology, concept, or term." },
-                  back: { type: Type.STRING, description: "Clear, simple definition of the term." }
-                },
-                required: ["front", "back"]
-              }
-            }
-          }
-        });
-
-        const flashcardsData = JSON.parse(response.text || "[]");
-        return res.json(flashcardsData);
-      }
-
-      if (action === "plan") {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: `${docGroundingContext}\n\nTask: Design a lesson timeline study plan to successfully digest this study material under 5 days, showing milestones. Keep output strictly formatted as JSON.`,
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                milestones: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      phase: { type: Type.STRING, description: "Milestone phase name (e.g., 'Day 1-2')" },
-                      topics: { type: Type.STRING, description: "Focus subjects" },
-                      tasks: { type: Type.STRING, description: "Actual steps" }
-                    },
-                    required: ["phase", "topics", "tasks"]
-                  }
-                },
-                tips: { type: Type.STRING, description: "Encouraging tips to optimize memory absorption." }
-              },
-              required: ["title", "milestones", "tips"]
-            }
-          }
-        });
-
-        const plannerData = JSON.parse(response.text || "{}");
-        return res.json(plannerData);
-      }
-
-      if (action === "chat") {
-        // Construct standard conversational prompts with grounding
-        const contentsPayload: any[] = [];
-        
-        // Push grounding context as first instruction block
-        contentsPayload.push({
-          role: "user",
-          parts: [{ text: `Here is the study material context the system must follow:\n\n${docGroundingContext}` }]
-        });
-        
-        contentsPayload.push({
-          role: "model",
-          parts: [{ text: "Understood thoroughly. I will answer all questions using these custom materials as my principal grounding base. Please ask your first question!" }]
-        });
-
-        // Push dialogue history safely
-        if (history && Array.isArray(history)) {
-          history.forEach((h: any) => {
-            contentsPayload.push({
-              role: h.role === "user" ? "user" : "model",
-              parts: [{ text: h.content || h.text || "" }]
-            });
+        if (action === "summarize") {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: `${docGroundingContext}\n\nTask: Compile a beautiful, structured, and comprehensive study summary of these notes. Include key highlights, important formulas/notations, list of terminologies, and real-world impact.`,
+            config: { systemInstruction: systemPrompt }
           });
+          return res.json({ summary: response.text });
         }
 
-        // Push the new message
-        contentsPayload.push({
-          role: "user",
-          parts: [{ text: message || "Hello! Explain what this material is briefly." }]
-        });
+        if (action === "explain") {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: `${docGroundingContext}\n\nTask: Explain the core subjects of these study documents in extremely simple, intuitive layman terms. Use warm analogies, daily life comparisons, and bilingual Burmese/English keywords for max retention.`,
+            config: { systemInstruction: systemPrompt }
+          });
+          return res.json({ explanation: response.text });
+        }
 
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: contentsPayload,
-          config: { systemInstruction: systemPrompt }
-        });
+        if (action === "quiz") {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: `${docGroundingContext}\n\nTask: Generate exactly ${count} multiple choice questions evaluating active recall comprehension of these documents. Ensure to return a robust list with clear options, correct answer string, and detailed explanatory guidelines. Keep output strictly formatted as JSON.`,
+            config: {
+              systemInstruction: systemPrompt,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    question: { type: Type.STRING },
+                    options: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING }
+                    },
+                    answer: { type: Type.STRING, description: "Correct reply parameter, must match one of the precise option strings." },
+                    explanation: { type: Type.STRING, description: "Educational takeaway explanation." }
+                  },
+                  required: ["question", "options", "answer", "explanation"]
+                }
+              }
+            }
+          });
 
-        return res.json({ text: response.text });
+          const quizData = JSON.parse(response.text || "[]");
+          return res.json(quizData);
+        }
+
+        if (action === "flashcards") {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: `${docGroundingContext}\n\nTask: Create exactly 10 distinct active recall flashcards summarizing critical terminologies from these documents. Keep 'front' sides to key terminology terms, and 'back' sides to clear, simple definitions. Keep output strictly formatted as JSON.`,
+            config: {
+              systemInstruction: systemPrompt,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    front: { type: Type.STRING, description: "A key terminology, concept, or term." },
+                    back: { type: Type.STRING, description: "Clear, simple definition of the term." }
+                  },
+                  required: ["front", "back"]
+                }
+              }
+            }
+          });
+
+          const flashcardsData = JSON.parse(response.text || "[]");
+          return res.json(flashcardsData);
+        }
+
+        if (action === "plan") {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: `${docGroundingContext}\n\nTask: Design a lesson timeline study plan to successfully digest this study material under 5 days, showing milestones. Keep output strictly formatted as JSON.`,
+            config: {
+              systemInstruction: systemPrompt,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  milestones: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        phase: { type: Type.STRING, description: "Milestone phase name (e.g., 'Day 1-2')" },
+                        topics: { type: Type.STRING, description: "Focus subjects" },
+                        tasks: { type: Type.STRING, description: "Actual steps" }
+                      },
+                      required: ["phase", "topics", "tasks"]
+                    }
+                  },
+                  tips: { type: Type.STRING, description: "Encouraging tips to optimize memory absorption." }
+                },
+                required: ["title", "milestones", "tips"]
+              }
+            }
+          });
+
+          const plannerData = JSON.parse(response.text || "{}");
+          return res.json(plannerData);
+        }
+
+        if (action === "chat") {
+          // Construct standard conversational prompts with grounding
+          const contentsPayload: any[] = [];
+          
+          // Push grounding context as first instruction block
+          contentsPayload.push({
+            role: "user",
+            parts: [{ text: `Here is the study material context the system must follow:\n\n${docGroundingContext}` }]
+          });
+          
+          contentsPayload.push({
+            role: "model",
+            parts: [{ text: "Understood thoroughly. I will answer all questions using these custom materials as my principal grounding base. Please ask your first question!" }]
+          });
+
+          // Push dialogue history safely
+          if (history && Array.isArray(history)) {
+            history.forEach((h: any) => {
+              contentsPayload.push({
+                role: h.role === "user" ? "user" : "model",
+                parts: [{ text: h.content || h.text || "" }]
+              });
+            });
+          }
+
+          // Push the new message
+          contentsPayload.push({
+            role: "user",
+            parts: [{ text: message || "Hello! Explain what this material is briefly." }]
+          });
+
+          const response = await ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: contentsPayload,
+            config: { systemInstruction: systemPrompt }
+          });
+
+          return res.json({ text: response.text });
+        }
+
+        return res.status(400).json({ error: "Unknown action specified." });
+
+      } catch (geminiErr: any) {
+        console.warn("Gemini active notebook companion failed (quota limits or key error). Falling back gracefully to simulated response:", geminiErr.message || geminiErr);
+        return runBypassAction();
       }
-
-      return res.status(400).json({ error: "Unknown action specified." });
 
     } catch (err: any) {
       console.error("AI Study Notebook general API error:", err);

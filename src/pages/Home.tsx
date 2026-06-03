@@ -16,6 +16,35 @@ import { NotificationsModal } from '../components/NotificationsModal';
 import { GroupDetailsModal } from '../components/GroupDetailsModal';
 import { triggerHaptic } from '../lib/haptic';
 
+const FeedCardSkeleton = () => (
+  <div className="flex flex-col p-5 bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-100 dark:border-slate-700/50 shadow-sm gap-4 animate-pulse">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-full bg-slate-200 dark:bg-slate-700" />
+        <div className="space-y-1.5">
+          <div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="h-3 w-16 rounded bg-slate-150 dark:bg-slate-700/40" />
+        </div>
+      </div>
+      <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-750" />
+    </div>
+    
+    <div className="space-y-2 py-1">
+      <div className="h-3.5 w-full rounded bg-slate-200 dark:bg-slate-700" />
+      <div className="h-3.5 w-5/6 rounded bg-slate-200 dark:bg-slate-700" />
+      <div className="h-3.5 w-2/3 rounded bg-slate-150 dark:bg-slate-700/40" />
+    </div>
+
+    <div className="flex items-center justify-between pt-1 border-t border-slate-50 dark:border-slate-700/20">
+      <div className="flex gap-4">
+        <div className="h-6 w-12 rounded-full bg-slate-100 dark:bg-slate-700" />
+        <div className="h-6 w-12 rounded-full bg-slate-100 dark:bg-slate-700" />
+      </div>
+      <div className="h-6 w-16 rounded-full bg-slate-100 dark:bg-slate-700" />
+    </div>
+  </div>
+);
+
 export default function Home() {
   const { userProfile, currentUser } = useAuth();
   const { t } = useLanguage();
@@ -999,8 +1028,10 @@ export default function Home() {
 
       {/* Feed listing */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-8 h-8 rounded-full border-4 border-[#1E3A8A] dark:border-white border-t-transparent animate-spin"></div>
+        <div className="space-y-4">
+          <FeedCardSkeleton />
+          <FeedCardSkeleton />
+          <FeedCardSkeleton />
         </div>
       ) : filteredPosts.length > 0 ? (
         <div className="space-y-5 mx-1">

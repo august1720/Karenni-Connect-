@@ -1,9 +1,10 @@
 {
-  "apiKey": "AIzaSyAttUs0gCbh0Ra1kHQPBv8xCTs97KxG2wA",
-  "authDomain": "karennni-youth-hub-bbb6bd.firebaseapp.com",
-  "projectId": "karennni-youth-hub-bbb6bd",
-  "storageBucket": "karennni-youth-hub-bbb6bd.firebasestorage.app",
-  "messagingSenderId": "828499510019",
+  "projectId": "karenni-youth-hub-bb6bd",
   "appId": "1:828499510019:web:6ee71ac8c847f08bcbe5f36",
+  "apiKey": "AIzaSyAttUsOgCbHoRalKHQPBVBwCTr97KxG2wA",
+  "authDomain": "karenni-youth-hub-bb6bd.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "karenni-youth-hub-bb6bd.firebasestorage.app",
+  "messagingSenderId": "828499510019",
   "measurementId": "G-D491VVTYB2"
 }

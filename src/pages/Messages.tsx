@@ -40,14 +40,9 @@ function ChatList() {
 
   useEffect(() => {
     if (!currentUser || location.pathname !== '/messages') return;
-    const q = query(
-      collection(db, 'chats'), 
-      where('participants', 'array-contains', currentUser.uid),
-      orderBy('lastMessageTime', 'desc')
-    );
-    
-    const unsub = onSnapshot(q, (snap) => {
-      const allChats = snap.docs.map(d => ({ id: d.id, ...d.data() } as Chat));
+
+    let unsubscribe: (() => void) | undefined;
+    const processChats = (allChats: Chat[]) => {
       // Deduplicate by other user id
       const uniqueChats = [];
       const seenUsers = new Set();
@@ -59,12 +54,32 @@ function ChatList() {
           uniqueChats.push(chat);
         }
       }
-      setChats(uniqueChats);
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'chats');
-    });
-    return unsub;
-  }, [currentUser]);
+      return uniqueChats;
+    };
+
+    const runMainQuery = () => {
+      const q = query(
+        collection(db, 'chats'), 
+        where('participants', 'array-contains', currentUser.uid)
+      );
+      
+      unsubscribe = onSnapshot(q, (snap) => {
+        const allChats = snap.docs.map(d => ({ id: d.id, ...d.data() } as Chat));
+        // Sort client side based on lastMessageTime desc
+        allChats.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+        setChats(processChats(allChats));
+      }, (err) => {
+        console.error("Chats query failed:", err);
+        handleFirestoreError(err, OperationType.GET, 'chats');
+      });
+    };
+
+    runMainQuery();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [currentUser, location.pathname]);
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] dark:bg-[#0F172A] pt-4 px-2 pb-24">

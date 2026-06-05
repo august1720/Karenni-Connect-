@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Moon, Sun, Monitor, LogOut, User, Bell, Shield, 
   Key, ChevronLeft, Globe, MessageSquare, AlertTriangle, Scale, BookOpen, Check, X,
-  Eye, EyeOff, Smartphone, ZoomIn, Trash2, Edit3, Image as ImageIcon
+  Eye, EyeOff, Smartphone, ZoomIn, Trash2, Edit3, Image as ImageIcon, DollarSign, Rocket
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { EditProfileModal } from '../components/EditProfileModal';
@@ -38,6 +38,11 @@ export default function Settings() {
   const [loadingFlagged, setLoadingFlagged] = useState(false);
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [passwordResetOpen, setPasswordResetOpen] = useState(false);
+  const [monetizationOpen, setMonetizationOpen] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const [moderationEnabled, setModerationEnabled] = useState(true);
   const [geminiConfigured, setGeminiConfigured] = useState<boolean | null>(null);
@@ -177,14 +182,24 @@ export default function Settings() {
     }
   };
 
-  const handlePasswordReset = async () => {
+  const handlePasswordReset = () => {
+    setResetSent(false);
+    setResetError(null);
+    setPasswordResetOpen(true);
+  };
+
+  const triggerPasswordResetEmail = async () => {
     if (!currentUser?.email) return;
+    setResetLoading(true);
+    setResetError(null);
     try {
       await sendPasswordResetEmail(auth, currentUser.email);
       setResetSent(true);
-      setTimeout(() => setResetSent(false), 3000);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("Password reset error:", e);
+      setResetError(e?.message || "Error sending password reset email");
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -453,6 +468,18 @@ export default function Settings() {
           />
         </Section>
 
+        {/* Monetization & Release */}
+        <Section title={t("Monetization & Release")}>
+          <ActionRow 
+            icon={DollarSign} color="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+            title={t("Ad Monetization Setup")} subtitle="Google AdSense & AdMob production settings"
+            onClick={() => {
+              triggerHaptic(15);
+              setMonetizationOpen(true);
+            }}
+          />
+        </Section>
+
         {/* Danger Zone */}
         <section>
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-rose-200 dark:border-rose-900/50 p-2 mb-4">
@@ -466,7 +493,7 @@ export default function Settings() {
         </section>
 
         <section>
-           <button onClick={() => auth.signOut()} className="w-full bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 flex items-center justify-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors font-semibold">
+           <button onClick={() => setLogoutConfirmOpen(true)} className="w-full bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 flex items-center justify-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors font-semibold">
              <LogOut className="w-5 h-5" />
              {t("Log Out")}
            </button>
@@ -498,6 +525,95 @@ export default function Settings() {
                   {t("Delete")}
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {logoutConfirmOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl max-w-sm w-full border border-slate-100 dark:border-slate-700"
+            >
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center mb-4 mx-auto">
+                <LogOut className="w-5 h-5 animate-pulse" />
+              </div>
+              <h3 className="text-lg font-black text-center text-slate-900 dark:text-white mb-2">{t("Are you sure you want to log out?")}</h3>
+              <p className="text-slate-500 dark:text-slate-450 text-center text-xs mb-6 leading-relaxed font-semibold">
+                {t("If you log out, you will be signed out from your account and need to log in again.")}
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setLogoutConfirmOpen(false)} className="flex-1 py-3 rounded-xl font-medium text-xs text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600 transition-colors">
+                  {t("Cancel")}
+                </button>
+                <button onClick={() => { setLogoutConfirmOpen(false); auth.signOut(); }} className="flex-1 py-3 rounded-xl font-bold text-xs text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 transition-colors shadow-lg shadow-red-500/10 cursor-pointer">
+                  {t("Yes, Log Out")}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+ 
+      {/* Password Reset Confirmation / Success Modal */}
+      <AnimatePresence>
+        {passwordResetOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl max-w-sm w-full border border-slate-100 dark:border-slate-700"
+            >
+              {!resetSent ? (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 flex items-center justify-center mb-4 mx-auto">
+                    <Key className="w-5 h-5 animate-bounce" />
+                  </div>
+                  <h3 className="text-lg font-black text-center text-slate-900 dark:text-white mb-2">{t("Password Reset Confirm")}</h3>
+                  <p className="text-slate-500 dark:text-slate-450 text-center text-xs mb-6 leading-relaxed font-semibold">
+                    {t("A password reset link will be sent to")} <strong className="text-slate-800 dark:text-slate-250 truncate block">{currentUser?.email}</strong>. {t("You can easily change your password from that link.")}
+                  </p>
+                  {resetError && (
+                    <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/20 text-red-600 text-xs rounded-xl font-medium text-center">
+                      Error: {resetError}
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <button onClick={() => setPasswordResetOpen(false)} className="flex-1 py-3 rounded-xl font-medium text-xs text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600 transition-colors">
+                      {t("Cancel")}
+                    </button>
+                    <button 
+                      onClick={triggerPasswordResetEmail} 
+                      disabled={resetLoading}
+                      className="flex-1 py-3 rounded-xl font-bold text-xs text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 transition-colors shadow-lg shadow-emerald-500/10 cursor-pointer"
+                    >
+                      {resetLoading ? t("Please wait...") : t("Send Link")}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 flex items-center justify-center mb-4 mx-auto">
+                    <Check className="w-6 h-6 animate-bounce" />
+                  </div>
+                  <h3 className="text-lg font-black text-center text-slate-900 dark:text-white mb-2">{t("Email Sent!")}</h3>
+                  <p className="text-slate-500 dark:text-slate-450 text-center text-xs mb-6 leading-relaxed font-semibold">
+                    {t("A password reset link has been successfully sent to")} <strong className="text-slate-800 dark:text-slate-250 truncate block">{currentUser?.email}</strong>. {t("Please check your inbox or spam folder.")}
+                  </p>
+                  <button 
+                    onClick={() => setPasswordResetOpen(false)}
+                    className="w-full py-3 rounded-xl font-bold text-xs text-white bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 transition-colors shadow-md"
+                  >
+                    {t("Okay")}
+                  </button>
+                </>
+              )}
             </motion.div>
           </div>
         )}
@@ -744,6 +860,106 @@ export default function Settings() {
                 className="w-full mt-6 py-3 bg-slate-900 dark:bg-slate-700 text-white font-black uppercase text-xs rounded-xl active:scale-95 transition-all text-center"
               >
                 Done
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Monetization & Release Guide Modal */}
+      <AnimatePresence>
+        {monetizationOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl max-w-md w-full border border-slate-100 dark:border-slate-700 my-8 overflow-hidden flex flex-col"
+            >
+              <div className="flex justify-between items-center mb-5 border-b pb-3 border-slate-100 dark:border-slate-700 shrink-0">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-emerald-500 animate-pulse" />
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">ကြော်ငြာနှင့် အပြင်ထုတ်လွှင့်ခြင်းလမ်းညွှန်</h3>
+                </div>
+                <button onClick={() => setMonetizationOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white font-black p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-5 overflow-y-auto max-h-[60vh] pr-1.5 scrollbar-thin font-semibold text-slate-800 dark:text-slate-200">
+                
+                {/* Intro Accent Card */}
+                <div className="p-4 bg-gradient-to-tr from-emerald-50/70 to-teal-50/40 dark:from-emerald-950/20 dark:to-teal-950/10 rounded-2xl border border-emerald-100/50 dark:border-emerald-950/30">
+                  <p className="text-[11px] leading-relaxed text-emerald-800 dark:text-emerald-300 font-bold">
+                    ဤသည်မှာ သင့်အက်ပလီကေးရှင်းကို Play Store / App Store နှင့် Web သို့ အောင်မြင်စွာ ထုတ်လွှင့်ပြီး Google Ads (AdMob / AdSense) ဖြင့် ပိုက်ဆံရှာရန် ပြင်ဆင်ရန် အဆင့်များဖြစ်ပါသည်။
+                  </p>
+                </div>
+
+                {/* Step 1: Ads Integration */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2 text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                    <span className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px]">1</span>
+                    <span>Google Ad Setup (ဝင်ငွေရှာနည်း)</span>
+                  </div>
+                  <div className="pl-8 text-xs space-y-2 text-slate-500 dark:text-slate-400">
+                    <p className="font-bold">
+                      • <strong className="text-slate-800 dark:text-slate-250">Ad Unit Live Configured:</strong> Home page Feed list ထဲတွင် sponsor ads များကို Auto-rotating စနစ်ဖြင့် ပြသရန် ထည့်သွင်းပေးထားပြီး ဖြစ်ပါသည်။ 
+                    </p>
+                    <p className="font-bold">
+                      • <strong className="text-slate-800 dark:text-slate-250">AdSense Integration:</strong> Web version အတွက် Google AdSense code ကို <code>index.html</code> (head tag block) ထဲသို့ ထည့်ရုံဖြင့် Feed posts ကြားတွင် banner ads များ live တက်လာပါမည်။
+                    </p>
+                    <p className="font-bold">
+                      • <strong className="text-slate-800 dark:text-slate-250">AdMob Integration:</strong> Mobile App (Android/iOS) အဖြစ် Android Studio ဖြင့် build ရန် <code className="bg-slate-100 dark:bg-slate-900 px-1 py-0.5 rounded text-rose-500">@react-native-admob</code> သို့မဟုတ် <code className="bg-slate-100 dark:bg-slate-900 px-1 py-0.5 rounded text-rose-500">cordova-plugin-admob</code> ကို wrapper တွင် သတ်မှတ်ပေးရန် လိုပါသည်။
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 2: Production Release Checklist */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2 text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                    <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px]">2</span>
+                    <span>Production Build & Export Guide</span>
+                  </div>
+                  <div className="pl-8 text-xs space-y-3.5 text-slate-500 dark:text-slate-400 font-semibold">
+                    <div>
+                      <span className="block font-black text-[11px] text-slate-850 dark:text-white uppercase mb-1">A. Export Project</span>
+                      <p>Settings menu မှ <strong>Export ZIP</strong> သို့မဟုတ် <strong>Export to GitHub</strong> ကို နှိပ်ပြီး ယခု app source code အလုံးစုံကို အလွယ်တကူ ရယူပါ။</p>
+                    </div>
+                    <div>
+                      <span className="block font-black text-[11px] text-slate-850 dark:text-white uppercase mb-1">B. Install & Bundle locally</span>
+                      <p>သင့် စက်ထဲသို့ ရောက်ရှိပါက root folder ၌ အောက်ပါ command များကို run ပြီး production static bundle ထုတ်ပါ -</p>
+                      <code className="block p-2 bg-slate-100 dark:bg-slate-900 text-[10px] text-indigo-500 dark:text-indigo-400 rounded-xl font-mono mt-1.5 border border-slate-200/50 dark:border-slate-800">
+                        npm install<br/>
+                        npm run build
+                      </code>
+                    </div>
+                    <div>
+                      <span className="block font-black text-[11px] text-slate-850 dark:text-white uppercase mb-1">C. Hosting Deploy</span>
+                      <p>ထွက်ရှိလာသော <code className="text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-900 px-1 rounded font-mono">dist/</code> static files folder အား Vercel, Netlify (သို့မဟုတ်) Firebase Hosting ပေါ်သို့ Upload တင်ပေးရုံဖြင့် web live လွှင့်နိုင်ပါမည်။</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3: Google Workspace & OAuth Client domains */}
+                <div className="space-y-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/50">
+                  <div className="flex items-center gap-2 text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                    <Rocket className="w-4 h-4 text-indigo-500" />
+                    <span>Domain & Store Deployment checklist</span>
+                  </div>
+                  <div className="pl-8 text-xs space-y-1.5 text-slate-500 dark:text-slate-400">
+                    <p>✔︎ Firebase Authentication setting တွင် သင့်ကိုယ်ပိုင် custom domain (ဥပမာ: myapp.com) အား Authorized domains တွင် ထည့်သွင်းပါ။</p>
+                    <p>✔︎ Google Cloud Console API credentials ထဲတွင် domain origins ကန့်သတ်ချက်များ သတ်မှတ်ပါ။</p>
+                    <p>✔︎ Play Store တွင် တင်နိုင်ရန် <strong className="text-slate-800 dark:text-slate-200">Capacitor JS wrapper</strong> ကို သုံး၍ ဤ web app ကို apk/aab အဖြစ် ၁၅ မိနစ်အတွင်း အလွယ်တကူ ပြောင်းလဲနိုင်သည်။</p>
+                  </div>
+                </div>
+
+              </div>
+
+              <button 
+                onClick={() => setMonetizationOpen(false)}
+                className="w-full mt-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-95 text-white font-black uppercase text-xs rounded-xl active:scale-[0.98] transition-all text-center shadow-lg shadow-emerald-500/10 cursor-pointer"
+              >
+                သိရှိပြီး (Understood)
               </button>
             </motion.div>
           </div>

@@ -292,6 +292,18 @@ const translations: Translations = {
   "Upload Cover Banner": { en: "Upload Cover Banner", my: "မျက်နှာဖုံးနဖူးစည်းပုံ တင်ရန်" },
   "Edit Rules & Guidelines": { en: "Edit Rules & Guidelines", my: "စည်းကမ်းချက်နှင့် လမ်းညွှန်ချက်များ ပြင်ဆင်ရန်" },
   "About Group Description": { en: "About Group Description", my: "အုပ်စုအကြောင်း ဖော်ပြချက်" },
+  "Are you sure you want to log out?": { en: "Are you sure you want to log out?", my: "အကောင့်မှ ထွက်ရန် သေချာပါသလား?" },
+  "If you log out, you will be signed out from your account and need to log in again.": { en: "If you log out, you will be signed out of your current session.", my: "အကယ်၍ ထွက်မည်ဆိုပါက ယခု login ဝင်ထားသော အကောင့်မှ logout ဖြစ်သွားမည် ဖြစ်သည်။" },
+  "Yes, Log Out": { en: "Yes, Log Out", my: "သေချာပေါက် ထွက်မည်" },
+  "Password Reset Confirm": { en: "Password Reset", my: "စကားဝှက် ပြောင်းလဲခြင်း" },
+  "A password reset link will be sent to": { en: "A password reset link will be sent to your email", my: "စကားဝှက်အသစ် ပြောင်းလဲသတ်မှတ်နိုင်မည့် လင့်ခ်ခလုတ်ကို ကလစ်နှိပ်ပြီး သင်၏အကောင့်အီးမေးလ် သို့ ပို့ပေးမည် ဖြစ်သည်။" },
+  "You can easily change your password from that link.": { en: "You can easily change your password from that link.", my: "ထိုလင့်ခ်မှတစ်ဆင့် စကားဝှက်ကို လွယ်ကူစွာ ပြောင်းလဲနိုင်ပါသည်။" },
+  "Please wait...": { en: "Please wait...", my: "ခေတ္တစောင့်ပါ..." },
+  "Send Link": { en: "Send Link", my: "လင့်ခ် ပို့မည်" },
+  "Email Sent!": { en: "Email Sent!", my: "အီးမေးလ် ပို့ပြီးပါပြီ!" },
+  "A password reset link has been successfully sent to": { en: "A password reset link has been successfully sent to", my: "စကားဝှက်အသစ်သတ်မှတ်ရန် လင့်ခ်ကို အောင်မြင်စွာ ပို့ထားပြီး ဖြစ်သည်။" },
+  "Please check your inbox or spam folder.": { en: "Please check your inbox or spam folder.", my: "ကျေးဇူးပြု၍ သင်၏ အီးမေးလ် Inbox (သို့မဟုတ် Spam folder) တွင် ဝင်ရောက်စစ်ဆေးကြည့်ပေးပါ။" },
+  "Okay": { en: "Okay", my: "သိရှိပြီး (Okay)" },
 };
 
 interface LanguageContextType {

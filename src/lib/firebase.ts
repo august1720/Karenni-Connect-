@@ -38,15 +38,39 @@ export enum OperationType {
   WRITE = 'write',
 }
 
-interface FirestoreErrorInfo {
+export interface FirestoreErrorInfo {
   error: string;
   operationType: OperationType;
   path: string | null;
   authInfo: any;
 }
 
+type DbErrorListener = (error: string) => void;
+const listeners = new Set<DbErrorListener>();
+
+export function addDbErrorListener(listener: DbErrorListener) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function notifyDbError(errorMessage: string) {
+  listeners.forEach(l => {
+    try {
+      l(errorMessage);
+    } catch (e) {
+      console.error("Error in DB listener:", e);
+    }
+  });
+}
+
 export function handleFirestoreError(error: any, operationType: OperationType, path: string | null) {
   const errMessage = error instanceof Error ? error.message : String(error);
+  
+  // Notify any active registered UI banner listeners
+  notifyDbError(errMessage);
+
   const errInfo: FirestoreErrorInfo = {
     error: errMessage,
     authInfo: {
@@ -63,6 +87,9 @@ export function handleFirestoreError(error: any, operationType: OperationType, p
     operationType,
     path,
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  
+  console.error('[Firestore Error Managed]', JSON.stringify(errInfo));
+  
+  // Note: Instead of crashing the whole client application asynchronously (which leads to uncaught exceptions),
+  // we do not throw here. This lets React continue operating and showing fallback queries client-side!
 }

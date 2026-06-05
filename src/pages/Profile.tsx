@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { auth, db } from '../lib/firebase';
+import { auth, db, notifyDbError } from '../lib/firebase';
 import { collection, query, where, getCountFromServer, doc, updateDoc, getDocs, orderBy, deleteDoc } from 'firebase/firestore';
 import { Button } from '../components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,35 +31,20 @@ export default function Profile() {
       setPostsLoading(true);
       const postsQuery = query(
         collection(db, 'posts'),
-        where('authorId', '==', currentUser.uid),
-        orderBy('createdAt', 'desc')
+        where('authorId', '==', currentUser.uid)
       );
       const querySnapshot = await getDocs(postsQuery);
       const fetchedPosts = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }) as Post);
+      // Sort client-side based on createdAt desc
+      fetchedPosts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setMyPosts(fetchedPosts);
       setPostsCount(fetchedPosts.length);
-    } catch (e) {
-      console.error("Error fetching my posts (with orderBy):", e);
-      // Fallback query without orderBy in case index isn't created yet
-      try {
-        const fallbackQuery = query(
-          collection(db, 'posts'),
-          where('authorId', '==', currentUser.uid)
-        );
-        const querySnapshot = await getDocs(fallbackQuery);
-        const fetchedPosts = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }) as Post);
-        fetchedPosts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setMyPosts(fetchedPosts);
-        setPostsCount(fetchedPosts.length);
-      } catch (fallbackErr) {
-        console.error("Fallback fetch failed:", fallbackErr);
-      }
+    } catch (e: any) {
+      console.error("Error fetching my posts:", e);
+      notifyDbError(e?.message || String(e));
     } finally {
       setPostsLoading(false);
     }

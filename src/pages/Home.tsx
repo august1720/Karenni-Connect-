@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { collection, query, orderBy, limit, getDocs, doc, setDoc, addDoc, getDoc, onSnapshot } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, storage } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, storage, notifyDbError } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Post } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -8,6 +8,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { Button } from '../components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PostCard } from '../components/PostCard';
+import { AdBanner } from '../components/AdBanner';
 import { uploadMedia } from '../lib/storage';
 import { checkContentModeration } from '../lib/moderation';
 import { X, StopCircle, RefreshCw, Search, Mic, Smile, Trash2, Play, Pause, Bell, CircleAlert, Paperclip, Link2, Globe, FileText, Youtube, File } from 'lucide-react';
@@ -150,6 +151,7 @@ export default function Home() {
       setStories(storiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err: any) {
       console.error("Firestore Loading issues captured gracefully:", err);
+      notifyDbError(err?.message || String(err));
       setConnectionError(err?.message || String(err));
     } finally {
       setLoading(false);
@@ -578,26 +580,53 @@ export default function Home() {
       {/* Connection Error / Offline Helpful Alert */}
       {connectionError && (
         <div className="mx-2 p-4 bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-500/30 rounded-2xl text-slate-800 dark:text-slate-200 shadow-sm space-y-3 animate-fade-in">
-          <div className="flex items-center gap-2.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-sm font-extrabold text-amber-700 dark:text-amber-400">
-              Firebase Firestore အော့ဖ်လိုင်း/မချိတ်ဆက်နိုင်ပါ
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-            အောက်ပါ အဆင့် ၃ ဆင့်ကို လုပ်ဆောင်ပေးရန် လိုအပ်ပါသည် -
-          </p>
-          <ol className="text-[11px] list-decimal pl-4.5 space-y-1.5 text-slate-600 dark:text-slate-300 font-medium">
-            <li>
-              <strong>Firestore database ဆောက်ရန်</strong>: Firebase Console သို့သွားပြီး Left menu ရှိ <strong className="text-amber-600">Firestore Database</strong> ကိုနှိပ်ပါ။ <strong className="text-amber-600">Create database</strong> ကိုနှိပ်၍ select လုပ်ပြီး ဖွင့်ရပါမည်။
-            </li>
-            <li>
-              <strong>GCP API Key restriction စစ်ရန်</strong>: Google Cloud Console Credentials တွင် <strong className="text-amber-600">Browser key (auto created by Firebase)</strong> ကိုနှိပ်ပြီး "Cloud Firestore API" ကို restrict မလုပ်ထားဘဲ enable လုပ်ရန် လိုအပ်ပါသည်။
-            </li>
-            <li>
-              <strong>Authorized Domains (Domain ခွင့်ပြုချက်)</strong>: Firebase Authentication settings &gt; <strong className="text-amber-600">Authorized Domains</strong> တွင် ယခု preview app link domain ကို list ထဲသို့ ထည့်သွင်းပေးရပါမည်။
-            </li>
-          </ol>
+          {connectionError.toLowerCase().includes('permission') ? (
+            <>
+              <div className="flex items-center gap-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />
+                <span className="text-sm font-extrabold text-red-600 dark:text-red-400">
+                  Firebase Firestore ဖတ်/ရေးခွင့်မရှိပါ (Missing Permissions)
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                ဤပြဿနာကို ဖြေရှင်းရန် အောက်ပါအတိုင်း ဆောင်ရွက်ပေးပါ -
+              </p>
+              <ol className="text-[11px] list-decimal pl-4.5 space-y-1.5 text-slate-600 dark:text-slate-300 font-medium">
+                <li>
+                  <strong>Firestore Security Rules ကို မန်နျူရယ်ထည့်သွင်းရန်</strong>: Firebase Console သို့သွားပြီး left menu ရှိ <strong className="text-red-600 dark:text-red-400">Firestore Database</strong> &gt; <strong className="text-red-600 dark:text-red-400">Rules</strong> tab ကို နှိပ်ပါ။
+                </li>
+                <li>
+                  <strong>Rules များကို ကူးယူထည့်ရန်</strong>: ဤကုဒ်ပတ်ဝန်းကျင်၏ Root directory တွင်ရှိသော <code>firestore.rules</code> ဖိုင်ထဲမှ ကုဒ်အားလုံးကို Copy ကူးယူပြီး Firebase Rules နေရာတွင် Paste လုပ်ပါ။
+                </li>
+                <li>
+                  <strong>Publish နှိပ်ပါ</strong>: ပြီးလျှင် <strong className="text-red-600 dark:text-red-400">Publish</strong> ခလုတ်ကို နှိပ်ပြီး ခွင့်ပြုချက် သိမ်းဆည်းလိုက်ပါ။
+                </li>
+              </ol>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-sm font-extrabold text-amber-700 dark:text-amber-400">
+                  Firebase Firestore အော့ဖ်လိုင်း/မချိတ်ဆက်နိုင်ပါ
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                အောက်ပါ အဆင့် ၃ ဆင့်ကို လုပ်ဆောင်ပေးရန် လိုအပ်ပါသည် -
+              </p>
+              <ol className="text-[11px] list-decimal pl-4.5 space-y-1.5 text-slate-600 dark:text-slate-300 font-medium">
+                <li>
+                  <strong>Firestore database ဆောက်ရန်</strong>: Firebase Console သို့သွားပြီး Left menu ရှိ <strong className="text-amber-600">Firestore Database</strong> ကိုနှိပ်ပါ။ <strong className="text-amber-600">Create database</strong> ကိုနှိပ်၍ select လုပ်ပြီး ဖွင့်ရပါမည်။
+                </li>
+                <li>
+                  <strong>GCP API Key restriction စစ်ရန်</strong>: Google Cloud Console Credentials တွင် <strong className="text-amber-600">Browser key (auto created by Firebase)</strong> ကိုနှိပ်ပြီး "Cloud Firestore API" ကို restrict မလုပ်ထားဘဲ enable လုပ်ရန် လိုအပ်ပါသည်။
+                </li>
+                <li>
+                  <strong>Authorized Domains (Domain ခွင့်ပြုချက်)</strong>: Firebase Authentication settings &gt; <strong className="text-amber-600">Authorized Domains</strong> တွင် ယခု preview app link domain ကို list ထဲသို့ ထည့်သွင်းပေးရပါမည်။
+                </li>
+              </ol>
+            </>
+          )}
           <div className="pt-1 select-all">
             <code className="text-[10px] font-mono block p-2 bg-slate-100 dark:bg-slate-900 rounded-lg text-slate-500 overflow-x-auto max-h-16">
               Error details: {connectionError}
@@ -1070,8 +1099,16 @@ export default function Home() {
       ) : filteredPosts.length > 0 ? (
         <div className="space-y-5 mx-1">
           <AnimatePresence>
-            {filteredPosts.map(post => (
-              <PostCard key={post.id} post={post} onDelete={handleDeletePost} />
+            {filteredPosts.map((post, index) => (
+              <React.Fragment key={post.id}>
+                <PostCard post={post} onDelete={handleDeletePost} />
+                {index === 1 && (
+                  <AdBanner id="feed-ad-1" slot="Banner #1" />
+                )}
+                {index === 4 && (
+                  <AdBanner id="feed-ad-2" slot="Banner #2" />
+                )}
+              </React.Fragment>
             ))}
           </AnimatePresence>
         </div>

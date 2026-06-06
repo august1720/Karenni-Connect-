@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Moon, Sun, Monitor, LogOut, User, Bell, Shield, 
   Key, ChevronLeft, Globe, MessageSquare, AlertTriangle, Scale, BookOpen, Check, X,
-  Eye, EyeOff, Smartphone, ZoomIn, Trash2, Edit3, Image as ImageIcon, DollarSign, Rocket
+  Eye, EyeOff, Smartphone, ZoomIn, Trash2, Edit3, ImageIcon, DollarSign, Rocket
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { EditProfileModal } from '../components/EditProfileModal';
@@ -800,10 +800,6 @@ export default function Settings() {
         )}
       </AnimatePresence>
 
-      {isEditModalOpen && (
-        <EditProfileModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} />
-      )}
-
       {/* Active Sessions Management Modal */}
       <AnimatePresence>
         {isActiveSessionsOpen && (
@@ -854,7 +850,6 @@ export default function Settings() {
                   </div>
                 ))}
               </div>
-
               <button 
                 onClick={() => setIsActiveSessionsOpen(false)}
                 className="w-full mt-6 py-3 bg-slate-900 dark:bg-slate-700 text-white font-black uppercase text-xs rounded-xl active:scale-95 transition-all text-center"
@@ -940,7 +935,7 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* Step 3: Google Workspace & OAuth Client domains */}
+                {/* Step 3: Domain & Store Release */}
                 <div className="space-y-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/50">
                   <div className="flex items-center gap-2 text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
                     <Rocket className="w-4 h-4 text-indigo-500" />
@@ -949,7 +944,7 @@ export default function Settings() {
                   <div className="pl-8 text-xs space-y-1.5 text-slate-500 dark:text-slate-400">
                     <p>✔︎ Firebase Authentication setting တွင် သင့်ကိုယ်ပိုင် custom domain (ဥပမာ: myapp.com) အား Authorized domains တွင် ထည့်သွင်းပါ။</p>
                     <p>✔︎ Google Cloud Console API credentials ထဲတွင် domain origins ကန့်သတ်ချက်များ သတ်မှတ်ပါ။</p>
-                    <p>✔︎ Play Store တွင် တင်နိုင်ရန် <strong className="text-slate-800 dark:text-slate-200">Capacitor JS wrapper</strong> ကို သုံး၍ ဤ web app ကို apk/aab အဖြစ် ၁၅ မိနစ်အတွင်း အလွယ်တကူ ပြောင်းလဲနိုင်သည်။</p>
+                    <p>✔︎ Play Store တွင် တင်နိုင်ရန် <strong className="text-slate-800 dark:text-slate-250">Capacitor JS wrapper</strong> ကို သုံး၍ ဤ web app ကို apk/aab အဖြစ် ၁၅ မိနစ်အတွင်း အလွယ်တကူ ပြောင်းလဲနိုင်သည်။</p>
                   </div>
                 </div>
 

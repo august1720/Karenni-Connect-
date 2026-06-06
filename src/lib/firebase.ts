@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore';
+import { initializeFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json'; // using the JSON in root
 
@@ -27,6 +27,18 @@ export const db = dbId
   : initializeFirestore(app, {
       experimentalForceLongPolling: true,
     });
+
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('[Firestore Offline Cache] Multiple tabs open. Persistence is enabled in another tab.');
+    } else if (err.code === 'unimplemented') {
+      console.warn('[Firestore Offline Cache] The current browser does not support persistence.');
+    } else {
+      console.error('[Firestore Offline Cache] Failed to enable persistence:', err);
+    }
+  });
+}
 export const storage = getStorage(app);
 
 export enum OperationType {

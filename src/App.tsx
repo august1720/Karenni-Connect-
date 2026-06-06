@@ -23,7 +23,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { triggerHaptic } from './lib/haptic';
 import { addDbErrorListener } from './lib/firebase';
-import { X, ArrowUp, Wifi, WifiOff } from 'lucide-react';
+import { X, ArrowUp, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 
 // Standardized pull-to-refresh configuration for snappier and consistent gesture response
 const PULL_THRESHOLD = 60;          // Required pull distance in pixels to trigger refresh
@@ -38,7 +38,7 @@ function ProtectedRoute() {
   const [showScrollTop, setShowScrollTop] = React.useState(false);
   const [showToast, setShowToast] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState('');
-  const [toastType, setToastType] = React.useState<'online' | 'offline'>('online');
+  const [toastType, setToastType] = React.useState<'online' | 'offline' | 'syncing'>('online');
 
   React.useEffect(() => {
     const unsub = addDbErrorListener((err) => {
@@ -51,28 +51,57 @@ function ProtectedRoute() {
   }, []);
 
   React.useEffect(() => {
+    let activeTimer: NodeJS.Timeout | null = null;
+    let syncTimer: NodeJS.Timeout | null = null;
+
     const handleOnline = () => {
-      setToastType('online');
-      setToastMessage('အင်တာနက် ပြန်ချိတ်ဆက်မိပါပြီ (Internet connection restored)');
+      if (activeTimer) clearTimeout(activeTimer);
+      if (syncTimer) clearTimeout(syncTimer);
+
+      setToastType('syncing');
+      setToastMessage('ဒေတာများ ပြန်စင့်ခ်လုပ်နေပါသည်... (Syncing & re-fetching latest data...)');
       setShowToast(true);
-      const timer = setTimeout(() => {
-        setShowToast(false);
-      }, 3500);
-      return () => clearTimeout(timer);
+      triggerHaptic(12);
+
+      // Fire global dispatch to trigger standard data recheck / sync in widgets
+      const refreshEvent = new CustomEvent('app-refresh');
+      window.dispatchEvent(refreshEvent);
+
+      // Transition to online status after a 2-second syncing animation
+      syncTimer = setTimeout(() => {
+        setToastType('online');
+        setToastMessage('အင်တာနက် ပြန်ချိတ်ဆက်ပြီး ဒေတာများအောင်မြင်စွာစင့်ခ်လုပ်ပြီးပါပြီ (Internet restored & data successfully synced)');
+        triggerHaptic(15);
+
+        activeTimer = setTimeout(() => {
+          setShowToast(false);
+        }, 3500);
+      }, 2000);
     };
 
     const handleOffline = () => {
+      if (activeTimer) clearTimeout(activeTimer);
+      if (syncTimer) clearTimeout(syncTimer);
+
       setToastType('offline');
-      setToastMessage('အင်တာနက်လိုင်း ပြတ်တောက်သွားပါသည် (Connection lost)');
+      setToastMessage('အင်တာနက်လိုင်း ပြတ်တောက်သွားပါသည် (Connection lost. Running in offline/cached mode)');
       setShowToast(true);
+      triggerHaptic(30);
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Initial check in case it's loaded offline
+    if (!navigator.onLine) {
+      handleOffline();
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (activeTimer) clearTimeout(activeTimer);
+      if (syncTimer) clearTimeout(syncTimer);
     };
   }, []);
 
@@ -416,21 +445,31 @@ function ProtectedRoute() {
             <div className={`p-4 rounded-2xl shadow-xl flex items-center justify-between gap-3 border ${
               toastType === 'offline' 
                 ? 'bg-red-50 dark:bg-red-950/90 border-red-200 dark:border-red-800/80 text-red-900 dark:text-red-100' 
+                : toastType === 'syncing'
+                ? 'bg-amber-50 dark:bg-amber-950/90 border-amber-200 dark:border-amber-805/80 text-amber-900 dark:text-amber-100'
                 : 'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-100'
             } backdrop-blur-md`}>
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-xl ${
+              <div className="flex items-center gap-3 w-[85%]">
+                <div className={`p-2 rounded-xl shrink-0 transition-colors duration-300 ${
                   toastType === 'offline' 
                     ? 'bg-red-200/50 dark:bg-red-500/20 text-red-600 dark:text-red-400' 
+                    : toastType === 'syncing'
+                    ? 'bg-amber-200/50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
                     : 'bg-emerald-200/50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                 }`}>
-                  {toastType === 'offline' ? <WifiOff className="w-5 h-5 animate-pulse" /> : <Wifi className="w-5 h-5" />}
+                  {toastType === 'offline' ? (
+                    <WifiOff className="w-5 h-5 animate-pulse" />
+                  ) : toastType === 'syncing' ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Wifi className="w-5 h-5" />
+                  )}
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0">
                   <span className="text-xs font-black tracking-tight uppercase opacity-90">
-                    {toastType === 'offline' ? 'Network Offline' : 'Network Online'}
+                    {toastType === 'offline' ? 'Network Offline' : toastType === 'syncing' ? 'Syncing...' : 'Network Online'}
                   </span>
-                  <span className="text-[11px] font-bold leading-tight mt-0.5 opacity-80">
+                  <span className="text-[11px] font-bold leading-tight mt-0.5 opacity-80 break-words">
                     {toastMessage}
                   </span>
                 </div>

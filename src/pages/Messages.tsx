@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useUserData } from '../hooks/useUserData';
 import { motion } from 'framer-motion';
-import { Send, Image as ImageIcon, ArrowLeft, Video, Settings, Search, Check, CheckCheck, X, Smile, Link as LinkIcon } from 'lucide-react';
+import { Send, Image as ImageIcon, ArrowLeft, Video, Settings, Search, Check, CheckCheck, X, Smile, Link as LinkIcon, Download } from 'lucide-react';
 import { uploadMedia } from '../lib/storage';
 import { VideoCall } from '../components/VideoCall';
 import { triggerHaptic } from '../lib/haptic';
@@ -475,7 +475,33 @@ function ChatRoom() {
                 ) : (
                   <>
                     {msg.mediaURL && (
-                      <img src={msg.mediaURL} alt="attachment" className="w-full max-w-xs rounded-xl mb-2 object-contain" />
+                      <div className="relative max-w-xs rounded-xl mb-2 overflow-hidden group">
+                        <img src={msg.mediaURL} alt="attachment" className="w-full h-auto rounded-xl object-contain max-h-[300px]" />
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const response = await fetch(msg.mediaURL!);
+                              const blob = await response.blob();
+                              const blobUrl = window.URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = blobUrl;
+                              link.download = `chat_image_${msg.createdAt}.jpg`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              window.URL.revokeObjectURL(blobUrl);
+                            } catch (err) {
+                              console.error("Failed to download image directly:", err);
+                              window.open(msg.mediaURL, '_blank');
+                            }
+                          }}
+                          className="absolute bottom-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-all flex items-center justify-center shadow-md cursor-pointer hover:scale-110 active:scale-95"
+                          title="Save Image"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                     {msg.text && renderMessageText(msg.text, isMe)}
                   </>

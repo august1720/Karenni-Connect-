@@ -24,6 +24,7 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [screenShareError, setScreenShareError] = useState<string | null>(null);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -175,6 +176,9 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
 
     try {
       if (!isScreenSharing) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+          throw new Error('Screen sharing is not supported in the current environment. If you are inside the secure Preview iframe, please click "Open in New Tab" at the top right of the screen to enable full browser permissions.');
+        }
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         const screenTrack = screenStream.getVideoTracks()[0];
         
@@ -189,11 +193,18 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
         
         if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
         setIsScreenSharing(true);
+        setScreenShareError(null);
       } else {
         stopScreenShare();
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error sharing screen', e);
+      if (e.name === 'NotAllowedError') {
+        setScreenShareError('ဘရောက်ဆာ လုံခြုံရေးအရ Screen Share ပြုလုပ်ခွင့်ကို ပိတ်ထားပါသည်။ App ကို "New Tab" သို့မဟုတ် တက်ဘ်အသစ်ဖြင့်ဖွင့်၍ စမ်းသပ်ပေးပါ (Screen capture permission was blocked or denied by the browser/iframe).');
+      } else {
+        setScreenShareError(`${e.message || 'Screen sharing error'} - App ကို "New Tab" သို့မဟုတ် တက်ဘ်အသစ်ဖြင့်ဖွင့်၍ စမ်းသပ်ပေးပါ (Please view this app in a separate browser tab to bypass iframe security blocks).`);
+      }
+      setTimeout(() => setScreenShareError(null), 10000);
     }
   };
   
@@ -233,6 +244,35 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
     <div className={`fixed inset-0 z-[100] bg-slate-900 flex flex-col ${isFullscreen ? '' : 'sm:p-4'}`}>
       <div className={`relative flex-1 bg-black overflow-hidden flex items-center justify-center ${isFullscreen ? '' : 'sm:rounded-[2rem]'}`}>
         
+        {/* Screen share tips banner */}
+        <div className="absolute top-4 left-4 right-20 sm:right-auto sm:max-w-md z-25 flex flex-col gap-1.5">
+          <div className="bg-slate-900/85 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-slate-700/50 shadow-lg text-left">
+            <p className="text-xs font-bold text-blue-400 flex items-center gap-1.5 uppercase tracking-wide">
+              <MonitorUp className="w-3.5 h-3.5 animate-pulse" />
+              Screen Share (စာရွက်စာတမ်းများ ပြသခြင်း)
+            </p>
+            <p className="text-[11px] text-slate-300 leading-normal font-medium mt-0.5">
+              PowerPoint, Word, PDF file စာရွက်စာတမ်းများကို တစ်ဖက်လူအား ပြသရန် Screen Share ကိုနှိပ်ပါ။ (Select standard browser tab or application window to present.)
+            </p>
+          </div>
+          {isScreenSharing && (
+            <div className="bg-emerald-500/10 border border-emerald-500/25 px-4 py-2 rounded-2xl backdrop-blur-md text-left text-emerald-400 text-[11px] font-black tracking-normal uppercase animate-pulse">
+              ● Screen sharing is active & presenting live
+            </div>
+          )}
+          {screenShareError && (
+            <div className="bg-rose-500/15 border border-rose-500/30 px-4 py-3 rounded-2xl backdrop-blur-md text-left text-rose-300 text-[11.5px] leading-relaxed shadow-lg">
+              <div className="font-extrabold text-rose-400 mb-1 flex items-center gap-1">
+                <span>⚠️ Screen Share error:</span>
+              </div>
+              <div>{screenShareError}</div>
+              <div className="mt-1.5 pt-1.5 border-t border-rose-500/20 text-[10.5px] text-slate-400">
+                💡 Tip: Application ကို "New Tab" သို့မဟုတ် Browser standalone tab ဖြင့်ဖွင့်အသုံးပြုပါက Screen Sharing ကို အောင်မြင်စွာ အသုံးပြုနိုင်ပါမည်။
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Remote Video */}
         {mediaError ? (
            <div className="flex flex-col items-center bg-slate-800 p-6 rounded-2xl max-w-md w-full mx-4 text-center z-10">
@@ -279,7 +319,7 @@ export function VideoCall({ roomId, targetUser, onEnd }: VideoCallProps) {
               {isVideoOn ? <VidIcon className="w-5 h-5"/> : <VideoOff className="w-5 h-5"/>}
             </button>
 
-            <button onClick={toggleScreenShare} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isScreenSharing ? 'bg-blue-500 hover:bg-blue-600' : 'bg-slate-700 hover:bg-slate-600'} text-white hidden sm:flex`}>
+            <button onClick={toggleScreenShare} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isScreenSharing ? 'bg-blue-500 hover:bg-blue-600' : 'bg-slate-700 hover:bg-slate-600'} text-white flex`}>
                <MonitorUp className="w-5 h-5" />
             </button>
 

@@ -11,7 +11,6 @@ export default function Navigation() {
   const navItems = [
     { to: "/", icon: Home, label: t("Home") },
     { to: "/discover", icon: Compass, label: t("Discover") },
-    { to: "/ai-study", icon: Sparkles, label: t("AI Study") },
     { to: "/messages", icon: MessageCircle, label: t("Messages") },
     { to: "/events", icon: Calendar, label: t("Events") },
     { to: "/profile", icon: User, label: t("Profile") },

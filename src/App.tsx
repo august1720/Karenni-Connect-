@@ -18,7 +18,6 @@ import { LoadingScreen } from './components/LoadingScreen';
 
 import UserProfile from './pages/UserProfile';
 import Settings from './pages/Settings';
-import AIStudy from './pages/AIStudy';
 import { LanguageProvider } from './context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { triggerHaptic } from './lib/haptic';
@@ -226,7 +225,6 @@ function ProtectedRoute() {
 
   const isHome = location.pathname === '/';
   const isDiscover = location.pathname === '/discover' || location.pathname.startsWith('/discover');
-  const isAIStudy = location.pathname === '/ai-study';
   const isMessages = location.pathname.startsWith('/messages');
   const isEvents = location.pathname === '/events';
   const isProfile = location.pathname === '/profile';
@@ -395,9 +393,6 @@ function ProtectedRoute() {
           <div style={{ display: isDiscover ? 'block' : 'none' }} className="w-full">
             <Discover />
           </div>
-          <div style={{ display: isAIStudy ? 'block' : 'none' }} className="w-full">
-            <AIStudy />
-          </div>
           <div style={{ display: isMessages ? 'block' : 'none' }} className="w-full">
             <Messages />
           </div>
@@ -530,7 +525,6 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={null} />
               <Route path="/discover" element={null} />
-              <Route path="/ai-study" element={null} />
               <Route path="/messages/*" element={null} />
               <Route path="/events" element={null} />
               <Route path="/profile" element={null} />

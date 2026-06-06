@@ -571,7 +571,7 @@ export function PostCard({ post, onDelete }: PostCardProps) {
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: -45, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 26 }}
                   className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-xl rounded-full px-3 py-2 flex gap-3.5 z-40"
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
@@ -583,17 +583,17 @@ export function PostCard({ post, onDelete }: PostCardProps) {
                       animate={{ scale: 1, y: 0 }}
                       transition={{ 
                         type: "spring", 
-                        stiffness: 300, 
-                        damping: 15, 
-                        delay: index * 0.03 
+                        stiffness: 600, 
+                        damping: 20, 
+                        delay: index * 0.01 
                       }}
-                      whileHover={{ scale: 1.4, y: -4, transition: { type: "spring", stiffness: 450, damping: 12 } }}
+                      whileHover={{ scale: 1.4, y: -4, transition: { type: "spring", stiffness: 650, damping: 14 } }}
                       whileTap={{ scale: 0.9 }}
                       onClick={() => {
                         handleReact(item.emoji);
                         setShowReactionsPop(false);
                       }}
-                      className="text-2xl filter hover:drop-shadow-md transition-all duration-150 focus:outline-none relative group/emoji"
+                      className="text-2xl filter hover:drop-shadow-md transition-all duration-75 focus:outline-none relative group/emoji"
                     >
                       {item.emoji}
                       

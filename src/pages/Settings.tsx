@@ -44,60 +44,6 @@ export default function Settings() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
 
-  const [moderationEnabled, setModerationEnabled] = useState(true);
-  const [geminiConfigured, setGeminiConfigured] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    // Fetch moderation toggle state
-    const fetchModerationSetting = async () => {
-      try {
-        const docRef = doc(db, 'settings', 'global_moderation');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setModerationEnabled(docSnap.data().enabled !== false);
-        } else {
-          // Initialize if it doesn't exist
-          await setDoc(docRef, { enabled: true });
-          setModerationEnabled(true);
-        }
-      } catch (err) {
-        console.error("Error fetching global moderation setting:", err);
-      }
-    };
-
-    // Fetch gemini configured status
-    const checkGeminiStatus = async () => {
-      try {
-        const res = await fetch('/api/moderation/status');
-        if (res.ok) {
-          const data = await res.json();
-          setGeminiConfigured(data.configured);
-        } else {
-          setGeminiConfigured(false);
-        }
-      } catch (err) {
-        console.error("Error fetching gemini status:", err);
-        setGeminiConfigured(false);
-      }
-    };
-
-    fetchModerationSetting();
-    checkGeminiStatus();
-  }, []);
-
-  const handleToggleModeration = async () => {
-    const newVal = !moderationEnabled;
-    setModerationEnabled(newVal);
-    try {
-      await setDoc(doc(db, 'settings', 'global_moderation'), { enabled: newVal });
-      triggerHaptic(12);
-    } catch (err) {
-      console.error("Error setting moderation status:", err);
-      // rollback
-      setModerationEnabled(!newVal);
-    }
-  };
-
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
@@ -382,40 +328,6 @@ export default function Settings() {
         
         {/* Campus Safety & Moderation Section */}
         <Section title={t("Campus Safety & Moderation")}>
-          <ActionRow 
-            icon={Shield} color="bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400"
-            title={t("AI Content Moderation")} subtitle={t("Real-time Gemini scanning on posts & media")}
-            rightContent={<Toggle enabled={moderationEnabled} onChange={handleToggleModeration} />}
-          />
-          <div className="flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-900/10 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border-t border-slate-100 dark:border-slate-700/50">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <AlertTriangle className="w-4 h-4" />
-              </div>
-              <div className="text-left">
-                <p className="font-medium text-slate-900 dark:text-white">{t("Gemini API Status")}</p>
-                <p className="text-xs text-slate-500">{t("Verifying key connection on the server")}</p>
-              </div>
-            </div>
-            <div>
-              {geminiConfigured === null ? (
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-850 px-2.5 py-1 rounded-full animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-ping"></span>
-                  Checking...
-                </span>
-              ) : geminiConfigured ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-full border border-emerald-100 dark:border-emerald-950/40">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  Configured
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/20 px-2.5 py-1 rounded-full border border-rose-150 dark:border-rose-950/35" title="Run in bypass mode - verify your GEMINI_API_KEY in server environment settings">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                  Bypassed / Missing Key
-                </span>
-              )}
-            </div>
-          </div>
           <ActionRow 
             icon={BookOpen} color="bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400"
             title={t("Community Guidelines")} subtitle={t("Student rules & unacceptable material codes")}
